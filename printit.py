@@ -4,7 +4,7 @@ import subprocess
 import os
 
 def print_image(file_path):
-    command = f"brother_ql -b pyusb --model QL-570 -p usb://0x04f9:0x2028/000M6Z401370 print -l 62 {file_path}"
+    command = f"brother_ql -b pyusb --model QL-570 -p usb://0x04f9:0x2028/000M6Z401370 print -l 62 \"{file_path}\""
     subprocess.run(command, shell=True)
 
 def save_uploaded_file(uploaded_file):
@@ -39,7 +39,7 @@ def save_uploaded_file(uploaded_file):
 
 st.title("Upload and Print PNG Image \n works best with 696 pixel wide image")
 
-uploaded_file = st.file_uploader("Choose a PNG file", type=['png'])
+uploaded_file = st.file_uploader("Choose a PNG file to :printer:", type=['png'])
 
 if uploaded_file is not None:
     file_path = save_uploaded_file(uploaded_file)
@@ -49,9 +49,18 @@ if uploaded_file is not None:
             print_image(file_path)
             st.success("Image sent to printer!")
 
-st.subheader("print one of the Last 6 Label sent")
+st.subheader("print one of Last 6 Label sent")
 
 temp_dir = "temp"
+
+@st.cache_data()
+def load_images(images):
+    loaded_images = []
+    for image in images:
+        image_path = os.path.join(temp_dir, image)
+        img = Image.open(image_path)
+        loaded_images.append((img, image))
+    return loaded_images
 
 # Check if the directory exists
 if os.path.exists(temp_dir):
@@ -59,9 +68,11 @@ if os.path.exists(temp_dir):
     # Filter only PNG files
     images = [file for file in files if file.endswith('.png')]
     # Reverse the list to get the last 6 images
-    images = images[-6:][::-1]
-    # Display each image
-    for idx, image in enumerate(images):
+    last_six_images = images[-6:][::-1]
+    loaded_images = load_images(last_six_images)
+
+    # Display each of the last 6 images
+    for idx, (img, image) in enumerate(loaded_images):
         image_path = os.path.join(temp_dir, image)
         col1, col2 = st.columns(2)
         with col1:
@@ -69,6 +80,15 @@ if os.path.exists(temp_dir):
         with col2:
             if st.button(f"Print {image}", key=f"print_{idx}"):
                 print_image(image_path)
+                st.success(f"Image {image} sent to printer!")
+
+    # Display the rest of the images as a list (without preview)
+    rest_of_images = images[:-6][::-1] # Excluding the last 6
+    if rest_of_images:
+        st.subheader("Rest of Labels:")
+        for image in rest_of_images:
+            if st.button(f"Print {image}", key=f"print_rest_{image}"):
+                print_image(os.path.join(temp_dir, image))
                 st.success(f"Image {image} sent to printer!")
 else:
     st.error(f"The directory {temp_dir} does not exist.")
