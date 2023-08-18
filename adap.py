@@ -21,6 +21,7 @@ def load_thumbnails():
         thumbnails.append(thumbnail)
     return thumbnails
 
+@st.cache_data
 def threshold_and_smooth_image(image, threshold_value, smoothing_kernel_size, invert_image):
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     _, thresholded_image = cv2.threshold(gray_image, threshold_value, 255, cv2.THRESH_BINARY)
@@ -33,6 +34,7 @@ def print_image(file_path):
     command = f"brother_ql -b pyusb --model QL-570 -p usb://0x04f9:0x2028/000M6Z401370 print -l 62 \"{file_path}\""
     subprocess.run(command, shell=True)
 
+@st.cache_data
 def image_to_data_url(image_input):
     if isinstance(image_input, np.ndarray): # NumPy array
         if len(image_input.shape) == 2 or image_input.shape[2] == 1: # Grayscale
