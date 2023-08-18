@@ -92,3 +92,50 @@ if os.path.exists(temp_dir):
                 st.success(f"Image {image} sent to printer!")
 else:
     st.error(f"The directory {temp_dir} does not exist.")
+
+ft = """
+<style>
+a:link , a:visited{
+color: #BFBFBF;  /* theme's text color hex code at 75 percent brightness*/
+background-color: transparent;
+text-decoration: none;
+}
+
+a:hover,  a:active {
+color: #0283C3; /* theme's primary color*/
+background-color: transparent;
+text-decoration: underline;
+}
+
+#page-container {
+  position: relative;
+  min-height: 10vh;
+}
+
+footer{
+    visibility:hidden;
+}
+
+.footer {
+position: relative;
+left: 0;
+top:230px;
+bottom: 0;
+width: 100%;
+background-color: transparent;
+color: #808080; /* theme's text color hex code at 50 percent brightness*/
+text-align: left; /* you can replace 'left' with 'center' or 'right' if you want*/
+}
+</style>
+
+<div id="page-container">
+
+<div class="footer">
+made at 
+<a style='display: inline; text-align: left;' href="https://wiki.sgmk-ssam.ch/wiki/PASAR_SENGGOL" target="_blank"> at the passar senggol</a> , 
+<a style='display: inline; text-align: left;' href="https://github.com/5shekel/brother_ql_web" target="_blank"> (source)</a></p>
+</div>
+
+</div>
+"""
+st.write(ft, unsafe_allow_html=True)
