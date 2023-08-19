@@ -38,14 +38,18 @@ uploaded_image = st.file_uploader("Choose an image file (png/jpg/gif)", type=['p
 
 if uploaded_image is not None:
     original_image = Image.open(uploaded_image).convert('RGB')
+    # Get the original filename without extension
+    original_filename_without_extension = os.path.splitext(uploaded_image.name)[0]
+
     resized_image, dithered_image = resize_and_dither(original_image)
     
     st.image(original_image, caption="Original Image")
     st.image(dithered_image, caption="Resized and Dithered Image")
 
-    # Paths to save the original and dithered images in the 'temp' directory
-    original_image_path = os.path.join('temp', 'original_image.png')
-    dithered_image_path = os.path.join('temp', 'dithered_image.png')
+
+    # Paths to save the original and dithered images in the 'temp' directory with postfix
+    original_image_path = os.path.join('temp', original_filename_without_extension + '_original.png')
+    dithered_image_path = os.path.join('temp', original_filename_without_extension + '_dithered.png')
 
     # Save both original and dithered images
     original_image.save(original_image_path, "PNG")
