@@ -1,8 +1,34 @@
 import streamlit as st
 from PIL import Image
+import numpy as np
+import cv2
 import subprocess
 import tempfile
 import os
+
+def convert_to_grayscale_with_white_transparency(pil_image):
+    # Convert PIL Image to NumPy array (with alpha channel if present)
+    image = np.array(pil_image.convert("RGBA"))
+
+    # Separate the alpha channel
+    alpha_channel = image[:, :, 3] / 255.0
+    rgb_channels = image[:, :, :3]
+
+    # Create a white background
+    white_background = np.ones_like(rgb_channels, dtype=np.uint8) * 255
+
+    # Blend based on the alpha channel
+    blended_image = (rgb_channels * alpha_channel[..., None] +
+                     white_background * (1 - alpha_channel[..., None]))
+
+    # Convert to grayscale using OpenCV
+    gray_image = cv2.cvtColor(blended_image.astype(np.uint8), cv2.COLOR_BGR2GRAY)
+
+    # Convert back to PIL Image
+    return Image.fromarray(gray_image)
+
+def rotate_image(image, angle):
+    return image.rotate(angle, expand=True)
 
 def resize_and_dither(image):
     # Resize the image to 696 width while maintaining the aspect ratio
@@ -17,7 +43,8 @@ def resize_and_dither(image):
     # Apply Floyd-Steinberg dithering
     dithered_image = resized_grayscale_image.convert("1", dither=Image.FLOYDSTEINBERG)
     
-    return resized_image, dithered_image
+    return resized_grayscale_image, dithered_image
+
 
 def print_image(image):
     # Save the image to a temporary file
@@ -40,8 +67,8 @@ if uploaded_image is not None:
     original_image = Image.open(uploaded_image).convert('RGB')
     # Get the original filename without extension
     original_filename_without_extension = os.path.splitext(uploaded_image.name)[0]
-
-    resized_image, dithered_image = resize_and_dither(original_image)
+    grayimage = convert_to_grayscale_with_white_transparency(original_image)
+    resized_image, dithered_image = resize_and_dither(grayimage)
     
     st.image(original_image, caption="Original Image")
     st.image(dithered_image, caption="Resized and Dithered Image")
@@ -55,6 +82,8 @@ if uploaded_image is not None:
     original_image.save(original_image_path, "PNG")
     dithered_image.save(dithered_image_path, "PNG")
     
+    rotated_image = rotate_image(dithered_image, 90)
+
     print(dithered_image_path)
     # Print options
     if st.button('Print Original Image'):
@@ -63,4 +92,8 @@ if uploaded_image is not None:
 
     if st.button('Print Dithered Image'):
         print_image(dithered_image)
+        st.success('Dithered image sent to printer!')
+
+    if st.button('Print rotated Image'):
+        print_image(rotated_image)
         st.success('Dithered image sent to printer!')
