@@ -6,26 +6,17 @@ import subprocess
 import tempfile
 import os
 
-def convert_to_grayscale_with_white_transparency(pil_image):
-    # Convert PIL Image to NumPy array (with alpha channel if present)
-    image = np.array(pil_image.convert("RGBA"))
+def add_white_background_and_convert_to_grayscale(image):
+    # Check if the image has transparency (an alpha channel)
+    if image.mode == 'RGBA':
+        # Create a white background of the same size as the original image
+        white_background = Image.new('RGBA', image.size, 'white')
+        # Paste the original image onto the white background
+        white_background.paste(image, mask=image.split()[3]) # Using the alpha channel as the mask
+        image = white_background
 
-    # Separate the alpha channel
-    alpha_channel = image[:, :, 3] / 255.0
-    rgb_channels = image[:, :, :3]
-
-    # Create a white background
-    white_background = np.ones_like(rgb_channels, dtype=np.uint8) * 255
-
-    # Blend based on the alpha channel
-    blended_image = (rgb_channels * alpha_channel[..., None] +
-                     white_background * (1 - alpha_channel[..., None]))
-
-    # Convert to grayscale using OpenCV
-    gray_image = cv2.cvtColor(blended_image.astype(np.uint8), cv2.COLOR_BGR2GRAY)
-
-    # Convert back to PIL Image
-    return Image.fromarray(gray_image)
+    # Convert the image to grayscale
+    return image.convert('L')
 
 def rotate_image(image, angle):
     return image.rotate(angle, expand=True)
@@ -35,7 +26,7 @@ def resize_and_dither(image):
     new_width = 696
     aspect_ratio = image.width / image.height
     new_height = int(new_width / aspect_ratio)
-    resized_image = image.resize((new_width, new_height), Image.ANTIALIAS)
+    resized_image = image.resize((new_width, new_height), Image.LANCZOS)
 
     # Convert the resized image to grayscale
     resized_grayscale_image = resized_image.convert("L")
@@ -59,15 +50,15 @@ def print_image(image):
     subprocess.run(command, shell=True)
 
 # Streamlit app
-st.title('Image Resizer and Dithering Tool')
-
+st.title('STICKER FACTORY in PASSAR SENGGOL')
+st.subheader("dithering is suggested if priting n color\n\nPRINT ALOT is the best!")
 uploaded_image = st.file_uploader("Choose an image file (png/jpg/gif)", type=['png', 'jpg', 'gif'])
 
 if uploaded_image is not None:
     original_image = Image.open(uploaded_image).convert('RGB')
     # Get the original filename without extension
     original_filename_without_extension = os.path.splitext(uploaded_image.name)[0]
-    grayimage = convert_to_grayscale_with_white_transparency(original_image)
+    grayimage = add_white_background_and_convert_to_grayscale(original_image)
     resized_image, dithered_image = resize_and_dither(grayimage)
     
     st.image(original_image, caption="Original Image")
