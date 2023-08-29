@@ -50,8 +50,8 @@ def print_image(image):
     subprocess.run(command, shell=True)
 
 # Streamlit app
-st.title('STICKER FACTORY in PASSAR SENGGOL')
-st.subheader("dithering is suggested if priting n color\n\nPRINT ALOT is the best!")
+st.title('STICKER FACTORY in TAMI')
+st.subheader("dithering is suggested if source is not lineart\n\nPRINT ALOT is the best!")
 uploaded_image = st.file_uploader("Choose an image file (png/jpg/gif)", type=['png', 'jpg', 'gif'])
 
 if uploaded_image is not None:
@@ -74,17 +74,21 @@ if uploaded_image is not None:
     dithered_image.save(dithered_image_path, "PNG")
     
     rotated_image = rotate_image(dithered_image, 90)
+    rotated_org_image = rotate_image(original_image, 90)
 
     print(dithered_image_path)
     # Print options
     if st.button('Print Original Image'):
         print_image(original_image)
         st.success('Original image sent to printer!')
+    if st.button('Print Original+rotated Image'):
+        print_image(original_image)
+        st.success('Original+rotated image sent to printer!')
 
     if st.button('Print Dithered Image'):
         print_image(dithered_image)
         st.success('Dithered image sent to printer!')
 
-    if st.button('Print rotated Image'):
+    if st.button('Print dithered+rotated Image'):
         print_image(rotated_image)
-        st.success('Dithered image sent to printer!')
+        st.success('Dithered+rotated image sent to printer!')
