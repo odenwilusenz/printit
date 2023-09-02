@@ -95,6 +95,65 @@ we use the zrok.io to secure a static url.
 zrok reserve public --backend-mode proxy 8989
 zrok share reserved xxxxxx
 ```
+
+
+### systemd
+add you service to keep it alive. 
+
+create at `/etc/systemd/system/sticker_zrok.service`
+```bash
+[Unit]
+Description=sticker factory and Zrok Service
+After=network.target
+
+[Service]
+ExecStart=/bin/bash -c 'source /home/<user>/brother_ql_web/venv/bin/activate && streamlit run printit.py --server.port 8989 & zrok
+   share reserved --headless eazrh3dn570q '
+WorkingDirectory=/home/<user>/brother_ql_web
+Environment="PATH=/home/devdesk/yair/brother_ql_web/venv/bin/python"
+Restart=always
+User=devdesk
+Group=devdesk
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl deamon-reload
+sudo systemctl enable sticker_zrok.service
+sudo systemctl start sticker_zrok.service
+
+#debug using
+sudo journalctl -u sticker_zrok.service -n 50 
+
+```
+
+## botprint
+this was a fun experimante in the 2023 ccc camp.   
+people printed a lot of stickers in 5 days.
+
+### usage
+added `flask`` to requirements.txt
+
+```bash
+pip install -r requirements.txt
+python botprint.py
+```
+
+test using
+```bash
+
+uri="https://kjvrml0bxatq.share.zrok.io"
+imagepath="output.png"
+curl -x POST -F "image=@${imagepath}" ${uri}
+```
+
+we use the zrok.io to secure a static url. 
+```bash
+zrok reserve public --backend-mode proxy 4678
+zrok share reserved kjvrml0bxatq
+```
+you can also run a service for this. 
 ### License
 
 This software is published under the terms of the GPLv3, see the LICENSE file in the repository.
