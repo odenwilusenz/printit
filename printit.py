@@ -1,11 +1,25 @@
 import streamlit as st
 from PIL import Image
-import numpy as np
-import cv2
+import requests, io, base64
 import subprocess
 import tempfile
 import os
+import slugify
 
+def generate_image(prompt, steps):
+    payload = {
+        "prompt": prompt,
+        "steps": 16,
+        "width": 696
+    }
+    
+    response = requests.post(url=f'https://y7bbzpsxx1vt.share.zrok.io/sdapi/v1/txt2img', json=payload)
+    r = response.json()
+    
+    for i in r['images']:
+        image = Image.open(io.BytesIO(base64.b64decode(i.split(",",1)[0])))
+        return image
+    
 def add_white_background_and_convert_to_grayscale(image):
     # Check if the image has transparency (an alpha channel)
     if image.mode == 'RGBA':
@@ -50,8 +64,9 @@ def print_image(image):
     subprocess.run(command, shell=True)
 
 # Streamlit app
-st.title('STICKER FACTORY in PASSAR SENGGOL')
-st.subheader("dithering is suggested if priting n color\n\nPRINT ALOT is the best!")
+st.title('STICKER FACTORY @ TAMI')
+
+st.subheader("Choose an image file (png/jpg/gif)")
 uploaded_image = st.file_uploader("Choose an image file (png/jpg/gif)", type=['png', 'jpg', 'gif'])
 
 if uploaded_image is not None:
@@ -74,17 +89,37 @@ if uploaded_image is not None:
     dithered_image.save(dithered_image_path, "PNG")
     
     rotated_image = rotate_image(dithered_image, 90)
+    rotated_org_image = rotate_image(original_image, 90)
 
     print(dithered_image_path)
     # Print options
     if st.button('Print Original Image'):
         print_image(original_image)
         st.success('Original image sent to printer!')
+    if st.button('Print Original+rotated Image'):
+        print_image(original_image)
+        st.success('Original+rotated image sent to printer!')
 
     if st.button('Print Dithered Image'):
         print_image(dithered_image)
         st.success('Dithered image sent to printer!')
 
-    if st.button('Print rotated Image'):
+    if st.button('Print dithered+rotated Image'):
         print_image(rotated_image)
-        st.success('Dithered image sent to printer!')
+        st.success('Dithered+rotated image sent to printer!')
+
+st.subheader("or generate an image from text")
+prompt = st.text_input("Enter a prompt")
+if prompt:
+    generatedImage = generate_image(prompt, 20)
+    resized_image, dithered_image = resize_and_dither(generatedImage)
+    st.image(resized_image, caption="Original Image")
+    st.image(dithered_image, caption="Resized and Dithered Image")
+    slugprompt = slugify.slugify(prompt)
+    original_image_path = os.path.join('temp', "txt2img_" + slugprompt + '.png')
+
+    print_image(dithered_image)
+
+st.subheader("FAQ:")
+st.write("dithering is suggested if source is not lineart\ngrayscale and color look bad at thermal printer\nthats why we do dethering\nPRINT ALOT is the best!")
+st.image(Image.open('temp/PXL_20230829_213310190_original.png'), caption="TAMI printshop")
