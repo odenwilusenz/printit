@@ -20,9 +20,6 @@ def detect_image_type(image):
     else:
         return 'Unknown'
 
-# Rest of the code remains the same
-
-
 def resize_and_dither(image):
     new_width = 696
     aspect_ratio = image.width / image.height
@@ -96,4 +93,4 @@ def api_print_image():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=4678)

@@ -1,3 +1,5 @@
 brother_ql
 bottle
 jinja2
+streamlit
+flask

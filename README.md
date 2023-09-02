@@ -78,6 +78,23 @@ All in all, the web server offers:
 * an API at `/api/print/text?text=Your_Text&font_size=100&font_family=Minion%20Pro%20(%20Semibold%20)`
   to print a label containing 'Your Text' with the specified font properties.
 
+
+## printit
+this was a fun experimante in the 2023 ccc camp.   
+people printed a lot of stickers in 5 days.
+
+### usage
+added `streamlit`` to requirements.txt
+```bash
+pip install -r requirements.txt
+streamlit run printit.py --server.port 8989
+```
+```
+we use the zrok.io to secure a static url. 
+```bash
+zrok reserve public --backend-mode proxy 8989
+zrok share reserved xxxxxx
+```
 ### License
 
 This software is published under the terms of the GPLv3, see the LICENSE file in the repository.
