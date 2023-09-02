@@ -143,9 +143,10 @@ python botprint.py
 test using
 ```bash
 
-uri="https://kjvrml0bxatq.share.zrok.io"
+uri="https://kjvrml0bxatq.share.zrok.io/api/print/image"
 imagepath="output.png"
-curl -x POST -F "image=@${imagepath}" ${uri}
+curl -F "image=@${imagepath}" ${uri}
+
 ```
 
 we use the zrok.io to secure a static url. 
