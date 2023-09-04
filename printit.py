@@ -8,7 +8,7 @@ import slugify
 
 # Function to find .ttf fonts
 def find_fonts():
-    font_dirs = ["/usr/share/fonts/truetype", "fonts"]
+    font_dirs = ["fonts", "/usr/share/fonts/"]
     fonts = []
     for dir in font_dirs:
         if os.path.exists(dir):
