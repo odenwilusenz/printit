@@ -131,7 +131,7 @@ if uploaded_image is not None:
 
 
 
-
+st.divider() 
 
 
 
@@ -193,24 +193,21 @@ with col2:
     alignment = st.selectbox("Choose text alignment", alignment_options, index=1)
 
 # Font Size
-max_size = calculate_max_font_size(696, text, font)
+max_size = calculate_max_font_size(696, text, font) 
 font_size = st.slider("Font Size", 10, max_size, max_size)
+fnt = ImageFont.truetype(font, font_size) # Initialize Font
 
-line_spacing = 4  # Adjust this value to set the desired line spacing
-
-# Initialize Font
-fnt = ImageFont.truetype(font, font_size)
+line_spacing = 20  # Adjust this value to set the desired line spacing
 
 # Calculate the new image height based on the bounding boxes
 new_image_height = calculate_actual_image_height_with_empty_lines(text, fnt, line_spacing)
 
 # Create Image
-img = Image.new("RGB", (696, new_image_height), color="white")
+y = 5  # Start from
+img = Image.new("RGB", (696, new_image_height+10), color="white")
 d = ImageDraw.Draw(img)
 
 # Draw Text
-y = 0  # Start from the top
-
 for line in text.split('\n'):
     text_width = 0  # Initialize to zero
 
@@ -235,10 +232,54 @@ for line in text.split('\n'):
 # Show Preview
 st.image(img, use_column_width=True)
 
-# Print Label Button
-if st.button('Print label'):
-    print_image(img)  # Function to print the image, needs to be defined
-    st.success('label sent to printer')
+cola, colb = st.columns(2)
+
+# Checkbox in colb
+# with colb:
+    # not ready
+    # do_rotate = st.checkbox('Rotate')
+do_rotate = False
+# Print Label Button in cola
+with cola:
+    if st.button('Print label'):
+        if do_rotate:
+            # Initialize min and max coordinates for x and y
+            min_x, min_y = img.size
+            max_x = max_y = 0
+
+            # Iterate over all pixels to find the bounding box
+            for y in range(img.height):
+                for x in range(img.width):
+                    # Get the color at this pixel
+                    pixel = img.getpixel((x, y))
+                    
+                    # If pixel is not white, update min and max coordinates
+                    if pixel != (255, 255, 255):
+                        min_x = min(min_x, x)
+                        min_y = min(min_y, y)
+                        max_x = max(max_x, x)
+                        max_y = max(max_y, y)
+
+            # Define the bounding box to crop
+            bbox = (min_x, min_y, max_x, max_y)
+            #if image is not rgb convert
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            # Crop the image using the bounding box
+            cropped_img = img.crop(bbox)
+            #scale to 30%
+            cropped_img = cropped_img.resize((int(cropped_img.width * 0.3), cropped_img.height), Image.NEAREST)
+
+            # Display the cropped image (for demonstration, in your case you would use 
+            st.image(cropped_img, use_column_width=True)
+
+            # rotated_image = rotate_image(img, 90)  # Needs definition
+            # print_image(rotated_image)  # Needs definition
+            # st.success('Label sent to printer')
+
+        else:
+            print_image(img)  # Needs definition
+            st.success('Label sent to printer')
 
 
 
@@ -247,6 +288,8 @@ if st.button('Print label'):
 
 
 
+
+st.divider() 
 
 
 
