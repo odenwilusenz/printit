@@ -124,7 +124,8 @@ sudo systemctl enable sticker_zrok.service
 sudo systemctl start sticker_zrok.service
 
 #debug using
-sudo journalctl -u sticker_zrok.service -n 50 
+sudo journalctl -u sticker_zrok.service --follow
+sudo journalctl -u botprint_zrok.service --follow
 
 ```
 

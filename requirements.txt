@@ -3,3 +3,4 @@ bottle
 jinja2
 streamlit
 flask
+pillow
