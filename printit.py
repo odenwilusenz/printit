@@ -62,7 +62,6 @@ def resize_and_dither(image):
     
     return resized_grayscale_image, dithered_image
 
-
 def print_image(image):
     # Save the image to a temporary file
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
@@ -74,6 +73,12 @@ def print_image(image):
     
     # Run the print command
     subprocess.run(command, shell=True)
+
+
+
+
+
+
 
 # Streamlit app
 st.title('STICKER FACTORY @ TAMI')
@@ -120,10 +125,28 @@ if uploaded_image is not None:
         print_image(rotated_image)
         st.success('Dithered+rotated image sent to printer!')
 
+
+
+
+
+
 st.subheader("or print some text")
 
+# Function to calculate the actual image height based on the bounding boxes of each line
+def calculate_actual_image_height_with_empty_lines(text, font, line_spacing=10):
+    draw = ImageDraw.Draw(Image.new("RGB", (1, 1), color="white"))  # Dummy image for calculation
+    total_height = 0
+    for line in text.split('\n'):
+        if line.strip():  # Non-empty lines
+            bbox = draw.textbbox((0, 0), line, font=font)
+            text_height = bbox[3] - bbox[1]
+        else:  # Empty lines
+            text_height = font.getbbox("x")[3] - font.getbbox("x")[1]  # Use the height of 'x' as the height for empty lines
+        total_height += text_height + line_spacing  # Add line spacing
+    return total_height - line_spacing  # Remove the last line spacing
+
 # Multiline Text Input
-text = st.text_area("Enter your text", "write")
+text = st.text_area("Enter your text", "write\nsomething")
 
 col1, col2 = st.columns(2)
 
@@ -137,42 +160,54 @@ with col2:
     alignment_options = ["left", "center", "right"]
     alignment = st.selectbox("Choose text alignment", alignment_options, index=1)
 
-
 # Font Size
 font_size = st.slider("Font Size", 10, 200, 50)
+line_spacing = 4  # Adjust this value to set the desired line spacing
 
-# Calculate Image Height
-num_lines = len(text.split('\n'))-1
-image_height = num_lines * (font_size + 10)  # 10 is line spacing
-
-# Create Image
-img = Image.new("RGB", (696, image_height), color="white")
-d = ImageDraw.Draw(img)
+# Initialize Font
 fnt = ImageFont.truetype(font, font_size)
 
+# Calculate the new image height based on the bounding boxes
+new_image_height = calculate_actual_image_height_with_empty_lines(text, fnt, line_spacing)
+
+# Create Image
+img = Image.new("RGB", (696, new_image_height), color="white")
+d = ImageDraw.Draw(img)
+
 # Draw Text
-y = 5
+y = 0  # Start from the top
 for line in text.split('\n'):
-    bbox = d.textbbox((0, y), line, font=fnt)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-    
+    if line.strip():  # For non-empty lines
+        bbox = d.textbbox((0, y), line, font=fnt)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+    else:  # For empty lines
+        text_height = fnt.getbbox("x")[3] - fnt.getbbox("x")[1]  # Use the height of a space as the height for empty lines
+
     if alignment == "center":
-        x = (696 - text_width) // 2
+        x = (696 - text_width) // 2 if line.strip() else 0
     elif alignment == "right":
-        x = 696 - text_width
+        x = 696 - text_width if line.strip() else 0
     else:
         x = 0
 
-    d.text((x, y), line, font=fnt, fill=(0, 0, 0))
-    y += text_height + 10
-
+    d.text((x, y), line if line.strip() else "", font=fnt, fill=(0, 0, 0))
+    y += text_height + line_spacing  # Move down based on text height and line spacing
 
 # Show Preview
-st.image(img, use_column_width=True, channels="luminance")
+st.image(img, use_column_width=True)
+
+# Print Label Button
 if st.button('Print label'):
-    print_image(img)
-    st.success('label sent to printer!')
+    print_image(img)  # Function to print the image, needs to be defined
+    st.success('label sent to printer')
+
+
+
+
+
+
+
 
 st.subheader("or generate an image from text")
 prompt = st.text_input("Enter a prompt")
