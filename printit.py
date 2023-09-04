@@ -247,7 +247,7 @@ for line in text.split('\n'):
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
     else:  # For empty lines
-        text_height = fnt.getbbox(" ")[3] - fnt.getbbox(" ")[1]  # Use the height of a space as the height for empty lines
+        text_height = fnt.getbbox("x ")[3] - fnt.getbbox("x")[1]  # Use the height of an x as the height for empty lines
 
     if alignment == "center":
         x = (696 - text_width) // 2
