@@ -105,51 +105,34 @@ if uploaded_image is not None:
     original_image.save(original_image_path, "PNG")
     dithered_image.save(dithered_image_path, "PNG")
     
-    rotated_image = rotate_image(dithered_image, 90)
-    rotated_org_image = rotate_image(original_image, 90)
 
-    print(dithered_image_path)
-    # Print options
-    if st.button('Print Original Image'):
-        print_image(original_image)
-        st.success('Original image sent to printer!')
-    if st.button('Print Original+rotated Image'):
-        print_image(original_image)
-        st.success('Original+rotated image sent to printer!')
+    # print options
+    colc, cold = st.columns(2)
+    with colc:
+        if st.button('Print Original Image'):
+            print_image(original_image)
+            st.success('Original image sent to printer!')
+    with cold:
+        if st.button('Print Dithered Image'):
+            print_image(dithered_image)
+            st.success('Dithered image sent to printer!')
 
-    if st.button('Print Dithered Image'):
-        print_image(dithered_image)
-        st.success('Dithered image sent to printer!')
+    cole, colf = st.columns(2)
+    with cole:
+        if st.button('Print Original+rotated Image'):
+            rotated_org_image = rotate_image(original_image, 90)
+            print_image(rotated_org_image)
+            st.success('Original+rotated image sent to printer!')
 
-    if st.button('Print dithered+rotated Image'):
-        print_image(rotated_image)
-        st.success('Dithered+rotated image sent to printer!')
-
-
-
-
-footer="""<style>
-.footer {
-    position: fixed;
-    left: 0;
-    bottom: 0;
-    width: 100%;
-    background-color: white;
-    color: black;
-    text-align: center;
-}
-</style>
-<div class="footer">
-<p>done at tami.sh, here is the <a href="https://github.com/5shekel/brother_ql_web" target="_blank">git</a></p>
-</div>
-"""
-st.markdown(footer,unsafe_allow_html=True)
+    with colf:
+        if st.button('Print dithered+rotated Image'):
+            rotated_image = rotate_image(dithered_image, 90)
+            print_image(rotated_image)
+            st.success('Dithered+rotated image sent to printer!')
 
 
 
 
-
-st.divider() 
 
 
 
@@ -158,6 +141,7 @@ st.divider()
 
 
 
+st.divider() 
 st.subheader("or print some text")
 
 
@@ -307,22 +291,24 @@ with cola:
 
 
 
+
+
+
+
 st.divider() 
-
-
-
-
-
 st.subheader("or generate an image from text")
 st.write("using tami stable diffusion bot")
 prompt = st.text_input("Enter a prompt")
 if prompt:
+    print("generating image from prompt: " + prompt)
     generatedImage = generate_image(prompt, 20)
     resized_image, dithered_image = resize_and_dither(generatedImage)
     st.image(resized_image, caption="Original Image")
     st.image(dithered_image, caption="Resized and Dithered Image")
     slugprompt = slugify.slugify(prompt)
     original_image_path = os.path.join('temp', "txt2img_" + slugprompt + '.png')
+    #svae image
+    generatedImage.save(original_image_path, "PNG")
 
     print_image(dithered_image)
 
