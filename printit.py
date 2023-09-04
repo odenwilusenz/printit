@@ -142,21 +142,6 @@ if uploaded_image is not None:
 
 st.subheader("or print some text")
 
-# Function to calculate spacebar width for a given font
-def get_spacebar_width(font_path, font_size):
-    font = ImageFont.truetype(font_path, font_size)
-    img = Image.new("RGB", (200, 100), "white")
-    draw = ImageDraw.Draw(img)
-    
-    bbox_single_x = draw.textbbox((0, 0), "x", font=font)
-    width_single_x = bbox_single_x[2] - bbox_single_x[0]
-    
-    bbox_double_x = draw.textbbox((0, 0), "x x", font=font)
-    width_double_x = bbox_double_x[2] - bbox_double_x[0]
-    
-    spacebar_width = width_double_x - 2 * width_single_x
-    return spacebar_width
-
 
 # Function to calculate the actual image height based on the bounding boxes of each line
 def calculate_actual_image_height_with_empty_lines(text, font, line_spacing=10):
@@ -172,20 +157,14 @@ def calculate_actual_image_height_with_empty_lines(text, font, line_spacing=10):
     return total_height - line_spacing  # Remove the last line spacing
 
 # Function to calculate the maximum font size based on the width of the longest line
-def calculate_max_font_size(width, text, font_path, start_size=10, end_size=200, step=1, standard_spacebar_width=18):
+def calculate_max_font_size(width, text, font_path, start_size=10, end_size=200, step=1):
     draw = ImageDraw.Draw(Image.new("RGB", (1, 1), color="white"))  # Dummy image for calculation
     max_font_size = start_size
-
-    # Calculate spacebar width for the font
-    spacebar_width = get_spacebar_width(font_path, start_size)
 
     for size in range(start_size, end_size, step):
         font = ImageFont.truetype(font_path, size)
         adjusted_lines = []
         for line in text.split('\n'):
-            # Adjust the line if needed based on spacebar_width
-            if spacebar_width < standard_spacebar_width:
-                line = line.replace(" ", " " * (standard_spacebar_width // spacebar_width))
             adjusted_lines.append(line)
 
         max_text_width = max([draw.textbbox((0, 0), line, font=font)[2] for line in adjusted_lines if line.strip()])
@@ -214,10 +193,8 @@ with col2:
     alignment = st.selectbox("Choose text alignment", alignment_options, index=1)
 
 # Font Size
-# Font Size
 max_size = calculate_max_font_size(696, text, font)
 font_size = st.slider("Font Size", 10, max_size, max_size)
-spacebar_width = get_spacebar_width(font, font_size)
 
 line_spacing = 4  # Adjust this value to set the desired line spacing
 
@@ -233,14 +210,9 @@ d = ImageDraw.Draw(img)
 
 # Draw Text
 y = 0  # Start from the top
-standard_spacebar_width = 20
 
 for line in text.split('\n'):
     text_width = 0  # Initialize to zero
-
-    # Replace single spaces with multiple spaces based on spacebar_width
-    if spacebar_width < standard_spacebar_width:
-        line = line.replace(" ", " " * (standard_spacebar_width // spacebar_width))
 
     if line.strip():  # For non-empty lines
         bbox = d.textbbox((0, y), line, font=fnt)
