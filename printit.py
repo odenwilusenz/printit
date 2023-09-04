@@ -83,7 +83,7 @@ def print_image(image):
 # Streamlit app
 st.title('STICKER FACTORY @ TAMI')
 
-st.subheader("Choose an image file (png/jpg/gif)")
+st.subheader("hard copies of images, text and txt2img")
 uploaded_image = st.file_uploader("Choose an image file (png/jpg/gif)", type=['png', 'jpg', 'gif'])
 
 if uploaded_image is not None:
