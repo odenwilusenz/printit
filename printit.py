@@ -128,6 +128,24 @@ if uploaded_image is not None:
 
 
 
+footer="""<style>
+.footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: white;
+    color: black;
+    text-align: center;
+}
+</style>
+<div class="footer">
+<p>done at tami.sh, here is the <a href="https://github.com/5shekel/brother_ql_web" target="_blank">git</a></p>
+</div>
+"""
+st.markdown(footer,unsafe_allow_html=True)
+
+
 
 
 
