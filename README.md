@@ -4,8 +4,11 @@
 this was a fun experimante in the 2023 ccc camp, people printed a lot of stickers.
 
 it currntly a mini obsession. it can do a few things and more to come.   
+live at > https://eazrh3dn570q.share.zrok.io
 
 original readme below, brother_ql printer driver hacked by https://github.com/pklaus/brother_ql !!
+
+netwrok access by the openziti/zrok projects
 
 ![print station](./assets/station_sm.jpg)
 ### usage
