@@ -3,12 +3,26 @@
 ## printit
 this was a fun experimante in the 2023 ccc camp, people printed a lot of stickers.
 
-it currntly a mini obsession. it can do a few things and more to come.   
-live at > https://eazrh3dn570q.share.zrok.io
+live at > https://eazrh3dn570q.share.zrok.io  
 
-original readme below, brother_ql printer driver hacked by https://github.com/pklaus/brother_ql !!
+it currntly a mini obsession. it can do a few things and more to come.   
+ * print images (dithered as its a b/w thing)
+ * print text
+ * print text2image using stable diffusion API
+
+original readme below, this is a fork of [brother_ql_web](https://github.com/pklaus/brother_ql_web)  
+both upstream and [printer driver](https://github.com/pklaus/brother_ql) by pklaus  !!
 
 network access by the openziti/zrok projects
+### TBD
+ * better text/label handeling
+   * wrap text for printing paragraphs
+   * rotate labels to print bigger stuff
+ * convert and print QR codes for URL
+ * ???
+ * profit
+ * 
+
 
 ![print station](./assets/station_sm.jpg)
 ### usage
