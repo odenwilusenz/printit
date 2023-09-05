@@ -314,4 +314,4 @@ if prompt:
 
 st.subheader("FAQ:")
 st.write("dithering is suggested if source is not lineart\ngrayscale and color look bad at thermal printer\nthats why we do dethering\nPRINT ALOT is the best!")
-st.image(Image.open('temp/PXL_20230829_213310190_original.png'), caption="TAMI printshop")
+st.image(Image.open('assets/station.png'), caption="TAMI printshop")
