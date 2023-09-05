@@ -84,7 +84,7 @@ def print_image(image):
 st.title('STICKER FACTORY @ TAMI')
 
 st.subheader("hard copies of images, text and txt2img")
-uploaded_image = st.file_uploader("Choose an image file (png/jpg/gif)", type=['png', 'jpg', 'gif'])
+uploaded_image = st.file_uploader("Choose an image file to :printer:", type=['png', 'jpg', 'gif'],)
 
 if uploaded_image is not None:
     original_image = Image.open(uploaded_image).convert('RGB')
@@ -181,7 +181,6 @@ def calculate_max_font_size(width, text, font_path, start_size=10, end_size=200,
 
 # Multiline Text Input
 text = st.text_area("Enter your text", "write\nsomething")
-
 col1, col2 = st.columns(2)
 
 # Font Selection
@@ -287,6 +286,43 @@ with cola:
 
 
 
+
+
+st.divider() 
+st.subheader("add a qr code to your sticker")
+
+import qrcode
+qr = qrcode.QRCode(
+    border=0
+)
+
+qrurl = st.text_input("Enter a url")
+qr.add_data(qrurl)
+qr.make(fit=True)
+imgqr = qr.make_image(fill_color="black", back_color="white")
+#save to image
+qrimgpath = os.path.join('temp', "qr.png")
+imgqr.save(qrimgpath, "PNG")
+
+#add qr below the label
+def get_concat_v(im1, im2):
+    dst = Image.new('RGB', (im1.width, im1.height + im2.height))
+    dst.paste(im1, (0, 0))
+    dst.paste(im2, (0, im1.height))
+    return dst
+
+qq = get_concat_v(img, imgqr)
+
+st.image(qq, use_column_width=True)
+colt, colu = st.columns(2)
+with colt:
+    if st.button("print label+qr"):
+        imgqr.size
+        qq.size
+        print_image(qq) 
+with colu:
+    if st.button("print qr"):
+        print_image(imgqr)
 
 
 
