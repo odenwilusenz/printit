@@ -196,7 +196,7 @@ with col2:
 
 # Font Size
 max_size = calculate_max_font_size(696, text, font) 
-font_size = st.slider("Font Size", 10, max_size, max_size)
+font_size = st.slider("Font Size", 0, max_size, max_size)
 fnt = ImageFont.truetype(font, font_size) # Initialize Font
 
 line_spacing = 20  # Adjust this value to set the desired line spacing
