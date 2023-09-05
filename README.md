@@ -8,7 +8,7 @@ live at > https://eazrh3dn570q.share.zrok.io
 
 original readme below, brother_ql printer driver hacked by https://github.com/pklaus/brother_ql !!
 
-netwrok access by the openziti/zrok projects
+network access by the openziti/zrok projects
 
 ![print station](./assets/station_sm.jpg)
 ### usage
