@@ -95,6 +95,9 @@ def img_concat_v(im1, im2):
 st.title('STICKER FACTORY @ TAMI')
 
 st.subheader("hard copies of images, text and txt2img")
+st.divider() 
+st.subheader(":printer: a sticker")
+
 uploaded_image = st.file_uploader("Choose an image file to :printer:", type=['png', 'jpg', 'gif'],)
 
 if uploaded_image is not None:
@@ -153,7 +156,7 @@ if uploaded_image is not None:
 
 
 st.divider() 
-st.subheader("or print some text")
+st.subheader(":printer: a label")
 
 img = ""
 
@@ -299,7 +302,7 @@ if text and not(qrurl):
 
 
 st.divider() 
-st.subheader("or generate an image from text")
+st.subheader(":printer: image from text")
 st.write("using tami stable diffusion bot")
 prompt = st.text_input("Enter a prompt")
 if prompt:
