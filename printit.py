@@ -200,7 +200,7 @@ def calculate_max_font_size(width, text, font_path, start_size=10, end_size=200,
 
 
 # Multiline Text Input
-text = st.text_area("Enter your text", height=200)
+text = st.text_area("Enter your text","write something", height=200)
 if text:                                                                                                                                                
     urls = find_url(text)
     if urls:
@@ -227,7 +227,8 @@ if text:
         with col2:
             alignment_options = ["left", "center", "right"]
             alignment = st.selectbox("Choose text alignment", alignment_options, index=1)
-        font_size = st.slider("Font Size", max_size, 5, max_size+20)
+        font_size = st.slider("Font Size", 5, max_size+5, max_size)
+        font_size
     # Font Size
     fnt = ImageFont.truetype(font, font_size) # Initialize Font
     line_spacing = 20  # Adjust this value to set the desired line spacing
