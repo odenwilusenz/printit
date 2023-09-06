@@ -4,6 +4,7 @@ import requests, io, base64
 import subprocess
 import tempfile
 import os
+import re
 import slugify
 import random, string
 
@@ -76,6 +77,10 @@ def print_image(image):
     # Run the print command
     subprocess.run(command, shell=True)
 
+def find_url(string):
+    url_pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+    urls = re.findall(url_pattern, string)
+    return urls
 
 def img_concat_v(im1, im2):
     image_width=696
@@ -196,7 +201,14 @@ def calculate_max_font_size(width, text, font_path, start_size=10, end_size=200,
 
 # Multiline Text Input
 text = st.text_area("Enter your text", height=200)
-if text:
+if text:                                                                                                                                                
+    urls = find_url(text)
+    if urls:
+        st.success("Found URLs: we might automate the QR code TODO")                                                                                                                        
+        for url in urls:
+            st.write(url)  
+
+    # init some font vars
     available_fonts = find_fonts()
     font=available_fonts[0]
     alignment = "center"
@@ -217,9 +229,7 @@ if text:
             alignment = st.selectbox("Choose text alignment", alignment_options, index=1)
         font_size = st.slider("Font Size", max_size, 5, max_size+20)
     # Font Size
-
     fnt = ImageFont.truetype(font, font_size) # Initialize Font
-
     line_spacing = 20  # Adjust this value to set the desired line spacing
 
     # Calculate the new image height based on the bounding boxes
@@ -263,7 +273,7 @@ qr = qrcode.QRCode(
     border=0
 )
 
-qrurl = st.text_input("add a qr code to your sticker, url or text :printer:",)
+qrurl = st.text_input("add a QRcode to your sticker",)
 if qrurl:
     #we have text generate qr
     qr.add_data(qrurl)
