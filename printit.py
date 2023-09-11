@@ -99,288 +99,267 @@ def img_concat_v(im1, im2):
 # Streamlit app
 st.title('STICKER FACTORY @ TAMI')
 
-st.subheader("hard copies of images, text and txt2img")
-st.divider() 
-st.subheader(":printer: a sticker")
+st.subheader(":printer: hard copies of images, text and txt2img")
 
-uploaded_image = st.file_uploader("Choose an image file to :printer:", type=['png', 'jpg', 'gif'],)
 
-if uploaded_image is not None:
-    original_image = Image.open(uploaded_image).convert('RGB')
-    # Get the original filename without extension
-    original_filename_without_extension = os.path.splitext(uploaded_image.name)[0]
-    grayimage = add_white_background_and_convert_to_grayscale(original_image)
-    resized_image, dithered_image = resize_and_dither(grayimage)
-    
-    st.image(original_image, caption="Original Image")
-    st.image(dithered_image, caption="Resized and Dithered Image")
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Sticker", "Label", "text2image", "Webcam", "FAQ"])
 
+with tab1:
+    st.subheader(":printer: a sticker")
 
-    # Paths to save the original and dithered images in the 'temp' directory with postfix
-    original_image_path = os.path.join('temp', original_filename_without_extension + '_original.png')
-    dithered_image_path = os.path.join('temp', original_filename_without_extension + '_dithered.png')
+    uploaded_image = st.file_uploader("Choose an image file to :printer:", type=['png', 'jpg', 'gif'],)
 
-    # Save both original and dithered images
-    original_image.save(original_image_path, "PNG")
-    dithered_image.save(dithered_image_path, "PNG")
-    
-
-    # print options
-    colc, cold = st.columns(2)
-    with colc:
-        if st.button('Print Original Image'):
-            print_image(original_image)
-            st.success('Original image sent to printer!')
-    with cold:
-        if st.button('Print Dithered Image'):
-            print_image(dithered_image)
-            st.success('Dithered image sent to printer!')
-
-    cole, colf = st.columns(2)
-    with cole:
-        if st.button('Print Original+rotated Image'):
-            rotated_org_image = rotate_image(original_image, 90)
-            print_image(rotated_org_image)
-            st.success('Original+rotated image sent to printer!')
-
-    with colf:
-        if st.button('Print dithered+rotated Image'):
-            rotated_image = rotate_image(dithered_image, 90)
-            print_image(rotated_image)
-            st.success('Dithered+rotated image sent to printer!')
-
-
-
-
-
-
-
-
-
-
-
-
-st.divider() 
-st.subheader(":printer: a label")
-
-img = ""
-
-# Function to calculate the actual image height based on the bounding boxes of each line
-def calculate_actual_image_height_with_empty_lines(text, font, line_spacing=10):
-    draw = ImageDraw.Draw(Image.new("RGB", (1, 1), color="white"))  # Dummy image for calculation
-    total_height = 0
-    for line in text.split('\n'):
-        if line.strip():  # Non-empty lines
-            bbox = draw.textbbox((0, 0), line, font=font)
-            text_height = bbox[3] - bbox[1]
-        else:  # Empty lines
-            text_height = font.getbbox("x")[3] - font.getbbox("x")[1]  # Use the height of 'x' as the height for empty lines
-        total_height += text_height + line_spacing  # Add line spacing
-    return total_height - line_spacing  # Remove the last line spacing
-
-# Function to calculate the maximum font size based on the width of the longest line
-def calculate_max_font_size(width, text, font_path, start_size=10, end_size=200, step=1):
-    draw = ImageDraw.Draw(Image.new("RGB", (1, 1), color="white"))  # Dummy image for calculation
-    max_font_size = start_size
-
-    for size in range(start_size, end_size, step):
-        font = ImageFont.truetype(font_path, size)
-        adjusted_lines = []
-        for line in text.split('\n'):
-            adjusted_lines.append(line)
-
-        max_text_width = max([draw.textbbox((0, 0), line, font=font)[2] for line in adjusted_lines if line.strip()])
-        
-        if max_text_width <= width:
-            max_font_size = size
-        else:
-            break
-
-    return max_font_size
-
-
-# Multiline Text Input
-text = st.text_area("Enter your text","write something", height=200)
-if text:                                                                                                                                                
-    urls = find_url(text)
-    if urls:
-        st.success("Found URLs: we might automate the QR code TODO")                                                                                                                        
-        for url in urls:
-            st.write(url)  
-
-    # init some font vars
-    available_fonts = find_fonts()
-    font=available_fonts[0]
-    alignment = "center"
-    fnt = ImageFont.truetype(font, 20) # Initialize Font
-    max_size = calculate_max_font_size(696, text, font) 
-    font_size = max_size
-    
-    fontstuff = st.checkbox("font settings", value=False)
-    col1, col2 = st.columns(2)
-    if fontstuff:
-        # Font Selection
-        with col1:
-            font = st.selectbox("Choose your font", available_fonts)
-
-        # Alignment
-        with col2:
-            alignment_options = ["left", "center", "right"]
-            alignment = st.selectbox("Choose text alignment", alignment_options, index=1)
-        font_size = st.slider("Font Size", 5, max_size+5, max_size)
-        font_size
-    # Font Size
-    fnt = ImageFont.truetype(font, font_size) # Initialize Font
-    line_spacing = 20  # Adjust this value to set the desired line spacing
-
-    # Calculate the new image height based on the bounding boxes
-    new_image_height = calculate_actual_image_height_with_empty_lines(text, fnt, line_spacing)
-
-    # Create Image
-    y = 5  # Start from
-    img = Image.new("RGB", (696, new_image_height+10), color="white")
-    d = ImageDraw.Draw(img)
-
-    # Draw Text
-    for line in text.split('\n'):
-        text_width = 0  # Initialize to zero
-
-        if line.strip():  # For non-empty lines
-            bbox = d.textbbox((0, y), line, font=fnt)
-            text_width = bbox[2] - bbox[0]
-            text_height = bbox[3] - bbox[1]
-        else:  # For empty lines
-            text_height = fnt.getbbox("x ")[3] - fnt.getbbox("x")[1]  # Use the height of an x as the height for empty lines
-
-        if alignment == "center":
-            x = (696 - text_width) // 2
-        elif alignment == "right":
-            x = 696 - text_width
-        else:
-            x = 0
-
-        d.text((x, y), line, font=fnt, fill=(0, 0, 0))
-        y += text_height + line_spacing  # Move down based on text height and line spacing
-
-
-
-
-
-# QR code
-
-
-import qrcode
-qr = qrcode.QRCode(
-    border=0
-)
-
-qrurl = st.text_input("add a QRcode to your sticker",)
-if qrurl:
-    #we have text generate qr
-    qr.add_data(qrurl)
-    qr.make(fit=True)
-    imgqr = qr.make_image(fill_color="black", back_color="white")
-
-    #save to image
-    # add random 4 letetrs to file name
-    # letters = string.ascii_lowercase
-    # random_string = ''.join(random.choice(letters) for i in range(4))
-    # qrimgpath = os.path.join('temp', "qr_" + random_string + '.png')
-    # imgqr.save(qrimgpath, "PNG")
-
-    if imgqr and img:
-        #add qr below the label
-        imgqr = img_concat_v(img, imgqr)
-        st.image(imgqr, use_column_width=True)
-        if st.button('Print sticker+qr'):
-                print_image(imgqr)
-    elif imgqr and not(img):
-        # st.image(imgqr, use_column_width=True)
-        if st.button('Print sticker'):
-                print_image(imgqr)
-
-
-if text and not(qrurl):
-    st.image(img, use_column_width=True)
-    if st.button('Print sticker'):
-            print_image(img)  # Needs definition
-            st.success('sticker sent to printer')
-
-
-
-
-
-
-
-st.divider() 
-st.subheader(":printer: image from text")
-st.write("using tami stable diffusion bot")
-prompt = st.text_input("Enter a prompt")
-if prompt:
-    print("generating image from prompt: " + prompt)
-    generatedImage = generate_image(prompt, 20)
-    resized_image, dithered_image = resize_and_dither(generatedImage)
-    st.image(resized_image, caption="Original Image")
-    st.image(dithered_image, caption="Resized and Dithered Image")
-    slugprompt = slugify.slugify(prompt)
-    original_image_path = os.path.join('temp', "txt2img_" + slugprompt + '.png')
-    #svae image
-    generatedImage.save(original_image_path, "PNG")
-
-    print_image(dithered_image)
-
-
-
-
-
-
-
-
-
-
-
-
-st.divider() 
-st.subheader(":printer: a photo")
-on = st.toggle('ask user for camera permission')
-if on:
-    picture = st.camera_input("Take a picture")
-    if picture is not None:
-        picture = Image.open(picture).convert('RGB')
+    if uploaded_image is not None:
+        original_image = Image.open(uploaded_image).convert('RGB')
         # Get the original filename without extension
-        grayimage = add_white_background_and_convert_to_grayscale(picture)
+        original_filename_without_extension = os.path.splitext(uploaded_image.name)[0]
+        grayimage = add_white_background_and_convert_to_grayscale(original_image)
         resized_image, dithered_image = resize_and_dither(grayimage)
         
+        st.image(original_image, caption="Original Image")
         st.image(dithered_image, caption="Resized and Dithered Image")
+
+
+        # Paths to save the original and dithered images in the 'temp' directory with postfix
+        original_image_path = os.path.join('temp', original_filename_without_extension + '_original.png')
+        dithered_image_path = os.path.join('temp', original_filename_without_extension + '_dithered.png')
+
+        # Save both original and dithered images
+        original_image.save(original_image_path, "PNG")
+        dithered_image.save(dithered_image_path, "PNG")
+        
 
         # print options
         colc, cold = st.columns(2)
         with colc:
-            if st.button('Print dithered+rotated Image'):
-                rotated_image = rotate_image(dithered_image, 90)
-                print_image(rotated_image)
-                st.balloons()
-                st.success('Dithered+rotated image sent to printer!')
+            if st.button('Print Original Image'):
+                print_image(original_image)
+                st.success('Original image sent to printer!')
         with cold:
             if st.button('Print Dithered Image'):
                 print_image(dithered_image)
                 st.success('Dithered image sent to printer!')
 
+        cole, colf = st.columns(2)
+        with cole:
+            if st.button('Print Original+rotated Image'):
+                rotated_org_image = rotate_image(original_image, 90)
+                print_image(rotated_org_image)
+                st.success('Original+rotated image sent to printer!')
+
+        with colf:
+            if st.button('Print dithered+rotated Image'):
+                rotated_image = rotate_image(dithered_image, 90)
+                print_image(rotated_image)
+                st.success('Dithered+rotated image sent to printer!')
+
+
+
+with tab2:
+    st.subheader(":printer: a label")
+
+    img = ""
+
+    # Function to calculate the actual image height based on the bounding boxes of each line
+    def calculate_actual_image_height_with_empty_lines(text, font, line_spacing=10):
+        draw = ImageDraw.Draw(Image.new("RGB", (1, 1), color="white"))  # Dummy image for calculation
+        total_height = 0
+        for line in text.split('\n'):
+            if line.strip():  # Non-empty lines
+                bbox = draw.textbbox((0, 0), line, font=font)
+                text_height = bbox[3] - bbox[1]
+            else:  # Empty lines
+                text_height = font.getbbox("x")[3] - font.getbbox("x")[1]  # Use the height of 'x' as the height for empty lines
+            total_height += text_height + line_spacing  # Add line spacing
+        return total_height - line_spacing  # Remove the last line spacing
+
+    # Function to calculate the maximum font size based on the width of the longest line
+    def calculate_max_font_size(width, text, font_path, start_size=10, end_size=200, step=1):
+        draw = ImageDraw.Draw(Image.new("RGB", (1, 1), color="white"))  # Dummy image for calculation
+        max_font_size = start_size
+
+        for size in range(start_size, end_size, step):
+            font = ImageFont.truetype(font_path, size)
+            adjusted_lines = []
+            for line in text.split('\n'):
+                adjusted_lines.append(line)
+
+            max_text_width = max([draw.textbbox((0, 0), line, font=font)[2] for line in adjusted_lines if line.strip()])
+            
+            if max_text_width <= width:
+                max_font_size = size
+            else:
+                break
+
+        return max_font_size
+
+
+    # Multiline Text Input
+    text = st.text_area("Enter your text to print, the label will automticly resize to fit the longest line, so use linebreaks.","write something", height=200)
+    if text:                                                                                                                                                
+        urls = find_url(text)
+        if urls:
+            st.success("Found URLs: we might automate the QR code TODO")                                                                                                                        
+            for url in urls:
+                st.write(url)  
+
+        # init some font vars
+        available_fonts = find_fonts()
+        font=available_fonts[0]
+        alignment = "center"
+        fnt = ImageFont.truetype(font, 20) # Initialize Font
+        max_size = calculate_max_font_size(696, text, font) 
+        font_size = max_size
+        
+        fontstuff = st.checkbox("font settings", value=False)
+        col1, col2 = st.columns(2)
+        if fontstuff:
+            # Font Selection
+            with col1:
+                font = st.selectbox("Choose your font", available_fonts)
+
+            # Alignment
+            with col2:
+                alignment_options = ["left", "center", "right"]
+                alignment = st.selectbox("Choose text alignment", alignment_options, index=1)
+            font_size = st.slider("Font Size", 5, max_size+5, max_size)
+            font_size
+        # Font Size
+        fnt = ImageFont.truetype(font, font_size) # Initialize Font
+        line_spacing = 20  # Adjust this value to set the desired line spacing
+
+        # Calculate the new image height based on the bounding boxes
+        new_image_height = calculate_actual_image_height_with_empty_lines(text, fnt, line_spacing)
+
+        # Create Image
+        y = 5  # Start from
+        img = Image.new("RGB", (696, new_image_height+10), color="white")
+        d = ImageDraw.Draw(img)
+
+        # Draw Text
+        for line in text.split('\n'):
+            text_width = 0  # Initialize to zero
+
+            if line.strip():  # For non-empty lines
+                bbox = d.textbbox((0, y), line, font=fnt)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+            else:  # For empty lines
+                text_height = fnt.getbbox("x ")[3] - fnt.getbbox("x")[1]  # Use the height of an x as the height for empty lines
+
+            if alignment == "center":
+                x = (696 - text_width) // 2
+            elif alignment == "right":
+                x = 696 - text_width
+            else:
+                x = 0
+
+            d.text((x, y), line, font=fnt, fill=(0, 0, 0))
+            y += text_height + line_spacing  # Move down based on text height and line spacing
 
 
 
 
 
-st.subheader("FAQ:")
-st.markdown(
-    '''
-    *dithering* is suggested if source is not lineart as grayscale and color look bad at thermal printer  
-    thats why we do dethering  
-    
-    PRINT ALOT is the best!
+    # QR code
 
-    all uplaoded images are saved  
-    uploaded camera snapshot are NOT saved, only printed. 
-    '''
+
+    import qrcode
+    qr = qrcode.QRCode(
+        border=0
     )
-st.image(Image.open('assets/station_sm.jpg'), caption="TAMI printshop")
+
+    qrurl = st.text_input("add a QRcode to your sticker",)
+    if qrurl:
+        #we have text generate qr
+        qr.add_data(qrurl)
+        qr.make(fit=True)
+        imgqr = qr.make_image(fill_color="black", back_color="white")
+
+        #save to image
+        # add random 4 letetrs to file name
+        # letters = string.ascii_lowercase
+        # random_string = ''.join(random.choice(letters) for i in range(4))
+        # qrimgpath = os.path.join('temp', "qr_" + random_string + '.png')
+        # imgqr.save(qrimgpath, "PNG")
+
+        if imgqr and img:
+            #add qr below the label
+            imgqr = img_concat_v(img, imgqr)
+            st.image(imgqr, use_column_width=True)
+            if st.button('Print sticker+qr'):
+                    print_image(imgqr)
+        elif imgqr and not(img):
+            # st.image(imgqr, use_column_width=True)
+            if st.button('Print sticker'):
+                    print_image(imgqr)
+
+
+    if text and not(qrurl):
+        st.image(img, use_column_width=True)
+        if st.button('Print sticker'):
+                print_image(img)  # Needs definition
+                st.success('sticker sent to printer')
+
+
+
+with tab3:
+    st.subheader(":printer: image from text")
+    st.write("using tami stable diffusion bot")
+    prompt = st.text_input("Enter a prompt")
+    if prompt:
+        print("generating image from prompt: " + prompt)
+        generatedImage = generate_image(prompt, 20)
+        resized_image, dithered_image = resize_and_dither(generatedImage)
+        st.image(resized_image, caption="Original Image")
+        st.image(dithered_image, caption="Resized and Dithered Image")
+        slugprompt = slugify.slugify(prompt)
+        original_image_path = os.path.join('temp', "txt2img_" + slugprompt + '.png')
+        #svae image
+        generatedImage.save(original_image_path, "PNG")
+
+        print_image(dithered_image)
+
+
+
+with tab4:
+    st.subheader(":printer: a snapshot")
+    on = st.toggle('ask user for camera permission')
+    if on:
+        picture = st.camera_input("Take a picture")
+        if picture is not None:
+            picture = Image.open(picture).convert('RGB')
+            # Get the original filename without extension
+            grayimage = add_white_background_and_convert_to_grayscale(picture)
+            resized_image, dithered_image = resize_and_dither(grayimage)
+            
+            st.image(dithered_image, caption="Resized and Dithered Image")
+
+            # print options
+            colc, cold = st.columns(2)
+            with colc:
+                if st.button('Print rotated Image'):
+                    rotated_image = rotate_image(dithered_image, 90)
+                    print_image(rotated_image)
+                    st.balloons()
+                    st.success('rotated image sent to printer!')
+            with cold:
+                if st.button('Print Image'):
+                    print_image(dithered_image)
+                    st.success('image sent to printer!')
+
+
+with tab5:
+    st.subheader("FAQ:")
+    st.markdown(
+        '''
+        *dithering* is suggested if source is not lineart as grayscale and color look bad at thermal printer  
+        thats why we do dethering  
+        
+        PRINT ALOT is the best!
+
+        all uploaded images are saved  
+        uploaded camera snapshot are NOT saved, only printed. 
+        '''
+        )
+    st.image(Image.open('assets/station_sm.jpg'), caption="TAMI printshop")
