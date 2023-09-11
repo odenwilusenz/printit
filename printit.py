@@ -99,7 +99,7 @@ def img_concat_v(im1, im2):
 # Streamlit app
 st.title('STICKER FACTORY @ TAMI')
 
-st.subheader(":printer: hard copies of images, text and txt2img")
+st.subheader(":printer: hard copies of images and text")
 
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Sticker", "Label", "text2image", "Webcam", "FAQ"])
