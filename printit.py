@@ -195,7 +195,11 @@ with tab2:
 
 
     # Multiline Text Input
-    text = st.text_area("Enter your text to print, the label will automticly resize to fit the longest line, so use linebreaks.","write something", height=200)
+    text = st.text_area("Enter your text to print","write something", height=200)
+    st.markdown('''
+               the label will automticly resize to fit the longest line, so use linebreaks.   
+               on pc `ctrl+enter` will submit, on mobile click outside the `text_area` to process.
+                ''')
     if text:                                                                                                                                                
         urls = find_url(text)
         if urls:
@@ -349,17 +353,19 @@ with tab4:
                     st.success('image sent to printer!')
 
 
+
 with tab5:
     st.subheader("FAQ:")
     st.markdown(
         '''
-        *dithering* is suggested if source is not lineart as grayscale and color look bad at thermal printer  
-        thats why we do dethering  
+        *dithering* is suggested (sometimes inforced) if source is not lineart as grayscale and color look bad at thermal printer  
+        
+        all uploaded images and generated labels are saved  
+        uploaded camera snapshot are NOT saved, only printed. 
+
+        app [code](https://github.com/5shekel/printit)
         
         PRINT ALOT is the best!
-
-        all uploaded images are saved  
-        uploaded camera snapshot are NOT saved, only printed. 
         '''
         )
     st.image(Image.open('assets/station_sm.jpg'), caption="TAMI printshop")
