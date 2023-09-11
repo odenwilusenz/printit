@@ -329,6 +329,58 @@ if prompt:
 
     print_image(dithered_image)
 
+
+
+
+
+
+
+
+
+
+
+
+st.divider() 
+st.subheader(":printer: a photo")
+on = st.toggle('ask user for camera permission')
+if on:
+    picture = st.camera_input("Take a picture")
+    if picture is not None:
+        picture = Image.open(picture).convert('RGB')
+        # Get the original filename without extension
+        grayimage = add_white_background_and_convert_to_grayscale(picture)
+        resized_image, dithered_image = resize_and_dither(grayimage)
+        
+        st.image(dithered_image, caption="Resized and Dithered Image")
+
+        # print options
+        colc, cold = st.columns(2)
+        with colc:
+            if st.button('Print dithered+rotated Image'):
+                rotated_image = rotate_image(dithered_image, 90)
+                print_image(rotated_image)
+                st.balloons()
+                st.success('Dithered+rotated image sent to printer!')
+        with cold:
+            if st.button('Print Dithered Image'):
+                print_image(dithered_image)
+                st.success('Dithered image sent to printer!')
+
+
+
+
+
+
 st.subheader("FAQ:")
-st.write("dithering is suggested if source is not lineart\ngrayscale and color look bad at thermal printer\nthats why we do dethering\nPRINT ALOT is the best!")
+st.markdown(
+    '''
+    *dithering* is suggested if source is not lineart as grayscale and color look bad at thermal printer  
+    thats why we do dethering  
+    
+    PRINT ALOT is the best!
+
+    all uplaoded images are saved  
+    uploaded camera snapshot are NOT saved, only printed. 
+    '''
+    )
 st.image(Image.open('assets/station_sm.jpg'), caption="TAMI printshop")
