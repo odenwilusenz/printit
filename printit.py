@@ -6,8 +6,6 @@ import tempfile
 import os
 import re
 import slugify
-import random, string
-
 
 # Function to find .ttf fonts
 def find_fonts():
@@ -196,10 +194,7 @@ with tab2:
 
     # Multiline Text Input
     text = st.text_area("Enter your text to print","write something", height=200)
-    st.markdown('''
-               the label will automticly resize to fit the longest line, so use linebreaks.   
-               on pc `ctrl+enter` will submit, on mobile click outside the `text_area` to process.
-                ''')
+
     if text:                                                                                                                                                
         urls = find_url(text)
         if urls:
@@ -304,7 +299,10 @@ with tab2:
         if st.button('Print sticker'):
                 print_image(img)  # Needs definition
                 st.success('sticker sent to printer')
-
+    st.markdown('''
+                * label will automaticly resize to fit the longest line, so use linebreaks.   
+                * on pc `ctrl+enter` will submit, on mobile click outside the `text_area` to process.
+                ''')
 
 
 with tab3:
