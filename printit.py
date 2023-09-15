@@ -102,6 +102,7 @@ st.subheader(":printer: hard copies of images and text")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Sticker", "Label", "text2image", "Webcam", "FAQ"])
 
+#sticker
 with tab1:
     st.subheader(":printer: a sticker")
 
@@ -152,7 +153,7 @@ with tab1:
                 st.success('Dithered+rotated image sent to printer!')
 
 
-
+#label
 with tab2:
     st.subheader(":printer: a label")
 
@@ -305,6 +306,7 @@ with tab2:
                 ''')
 
 
+#text2img
 with tab3:
     st.subheader(":printer: image from text")
     st.write("using tami stable diffusion bot")
@@ -323,7 +325,7 @@ with tab3:
         print_image(dithered_image)
 
 
-
+# webcam
 with tab4:
     st.subheader(":printer: a snapshot")
     on = st.toggle('ask user for camera permission')
@@ -351,7 +353,7 @@ with tab4:
                     st.success('image sent to printer!')
 
 
-
+# faq
 with tab5:
     st.subheader("FAQ:")
     st.markdown(
