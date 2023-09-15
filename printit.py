@@ -98,7 +98,7 @@ st.title('STICKER FACTORY @ [TAMI](https://telavivmakers.org)')
 st.subheader(":printer: hard copies of images and text")
 
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Sticker", "Label", "text2image", "Webcam", "FAQ"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Sticker", "Label", "text2image", "Webcam","cat" , "FAQ"])
 
 #sticker
 with tab1:
@@ -309,7 +309,7 @@ with tab2:
 # To execute code only when a new prompt is entered, you need to keep track of the last prompt value
 if 'last_prompt' not in st.session_state:
     st.session_state.last_prompt = None
-    
+
 with tab3:
     st.subheader(":printer: image from text")
     st.write("using tami stable diffusion bot")
@@ -355,9 +355,24 @@ with tab4:
                     print_image(dithered_image)
                     st.success('image sent to printer!')
 
+# cat
+from io import BytesIO
+with tab5:
+    st.subheader(":printer: a cat")
+    st.caption("from the fine folks at https://cataas.com/c")
+    if st.button("Fetch cat"):
+        # Fetch image from the URL
+        response = requests.get("https://cataas.com/c")
+        img = Image.open(BytesIO(response.content))
+        # Display image in Streamlit
+        grayimage = add_white_background_and_convert_to_grayscale(img)
+        resized_image, dithered_image = resize_and_dither(grayimage)
+        st.image(img, caption="Fetched Cat Image")
+        # Your print logic here
+        print_image(dithered_image)
 
 # faq
-with tab5:
+with tab6:
     st.subheader("FAQ:")
     st.markdown(
         '''
