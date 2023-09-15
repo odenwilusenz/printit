@@ -92,8 +92,6 @@ def img_concat_v(im1, im2):
 
 
 
-
-
 # Streamlit app
 st.title('STICKER FACTORY @ [TAMI](https://telavivmakers.org)')
 
@@ -307,11 +305,16 @@ with tab2:
 
 
 #text2img
+# Streamlit reruns the script every time the user interacts with the page. 
+# To execute code only when a new prompt is entered, you need to keep track of the last prompt value
+if 'last_prompt' not in st.session_state:
+    st.session_state.last_prompt = None
+    
 with tab3:
     st.subheader(":printer: image from text")
     st.write("using tami stable diffusion bot")
     prompt = st.text_input("Enter a prompt")
-    if prompt:
+    if prompt and prompt != st.session_state.last_prompt:
         print("generating image from prompt: " + prompt)
         generatedImage = generate_image(prompt, 20)
         resized_image, dithered_image = resize_and_dither(generatedImage)
@@ -319,11 +322,11 @@ with tab3:
         st.image(dithered_image, caption="Resized and Dithered Image")
         slugprompt = slugify.slugify(prompt)
         original_image_path = os.path.join('temp', "txt2img_" + slugprompt + '.png')
-        #svae image
-        generatedImage.save(original_image_path, "PNG")
-
+        generatedImage.save(original_image_path, "PNG")         #save image
         print_image(dithered_image)
 
+        # Update last prompt
+        st.session_state.last_prompt = prompt
 
 # webcam
 with tab4:
