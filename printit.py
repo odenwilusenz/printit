@@ -1,11 +1,12 @@
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
-import requests, io, base64
+import slugify
+import requests
+import io, base64
 import subprocess
 import tempfile
 import os
 import re
-import slugify
 
 # Function to find .ttf fonts
 def find_fonts():
@@ -98,7 +99,7 @@ st.title('STICKER FACTORY @ [TAMI](https://telavivmakers.org)')
 st.subheader(":printer: hard copies of images and text")
 
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Sticker", "Label", "text2image", "Webcam","cat" , "FAQ"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Sticker", "Label", "Text2image", "Webcam","Cat" , "FAQ"])
 
 #sticker
 with tab1:
@@ -356,14 +357,13 @@ with tab4:
                     st.success('image sent to printer!')
 
 # cat
-from io import BytesIO
 with tab5:
     st.subheader(":printer: a cat")
     st.caption("from the fine folks at https://cataas.com/c")
     if st.button("Fetch cat"):
         # Fetch image from the URL
         response = requests.get("https://cataas.com/c")
-        img = Image.open(BytesIO(response.content))
+        img = Image.open(io.BytesIO(response.content))
         # Display image in Streamlit
         grayimage = add_white_background_and_convert_to_grayscale(img)
         resized_image, dithered_image = resize_and_dither(grayimage)
