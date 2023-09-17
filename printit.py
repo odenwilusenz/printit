@@ -357,14 +357,33 @@ with tab4:
                     st.success('image sent to printer!')
 
 # cat
+import requests
+import io
+from PIL import Image
+import streamlit as st
+
+
+
 with tab5:
     st.subheader(":printer: a cat")
-    st.caption("from the fine folks at https://cataas.com/c")
+    st.caption("from the fine folks at https://thecatapi.com/")
     if st.button("Fetch cat"):
-        # Fetch image from the URL
-        response = requests.get("https://cataas.com/c")
-        img = Image.open(io.BytesIO(response.content))
-        # Display image in Streamlit
+        # Fetch API key from Streamlit secrets
+        api_key = st.secrets["cat_api_key"]
+        caturl = "https://api.thecatapi.com/v1/images/search"
+
+        # Fetch JSON data
+        api_url = f"{caturl}?limit=1&api_key={api_key}"
+        response = requests.get(api_url)
+        data = response.json()
+
+        # Extract image URL from JSON
+        image_url = data[0]['url']
+        
+        # Fetch the image
+        image_response = requests.get(image_url)
+        img = Image.open(io.BytesIO(image_response.content))        
+        # Display the image
         grayimage = add_white_background_and_convert_to_grayscale(img)
         resized_image, dithered_image = resize_and_dither(grayimage)
         st.image(img, caption="Fetched Cat Image")
