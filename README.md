@@ -3,7 +3,7 @@
 ## printit
 this was a fun experimante in the 2023 ccc camp, people printed a lot of stickers.
 
-live at > https://eazrh3dn570q.share.zrok.io  
+live at > https://eady3rrvez3u.zrok.yair.cc/ 
 
 it currntly a mini obsession. it can do a few things and more to come.   
  * print images (dithered as its a b/w thing)
