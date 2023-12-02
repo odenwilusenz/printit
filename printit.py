@@ -2,11 +2,31 @@ import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 import slugify
 import requests
-import io, base64
+import io, base64, os, re
 import subprocess
 import tempfile
-import os
-import re
+import hashlib
+from datetime import datetime
+import time
+
+# Function to list the last 15 saved images, excluding those ending with "dithered"
+def list_saved_images(directories=["temp", "labels"]):
+    files = []
+    for directory in directories:
+        if os.path.exists(directory):
+            files.extend([
+                os.path.join(directory, file) for file in os.listdir(directory)
+                if not file.endswith("dithered.png") and not file.endswith("dithered.jpg") and not file.endswith("dithered.gif") 
+                and file.endswith(('.png', '.jpg', '.gif'))
+            ])
+
+    # Sort files by modification time in descending order
+    files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+
+    # Return the last 15 files
+    return files[:15]
+
+
 
 # Function to find .ttf fonts
 def find_fonts():
@@ -19,6 +39,24 @@ def find_fonts():
                     if file.endswith(".ttf"):
                         fonts.append(os.path.join(root, file))
     return fonts
+
+
+def safe_filename(text):
+    # Sanitize the text to remove illegal characters and replace spaces with underscores
+    sanitized_text = re.sub(r'[<>:"/\\|?*\n\r]+', '', text).replace(' ', '_')
+
+    # Get the current time in epoch format
+    epoch_time = int(time.time())
+
+    # Return the filename
+    # return f"{sanitized_text}_{epoch_time}.png"
+    return f"{sanitized_text}.png"
+
+
+# Ensure label directory exists
+label_dir = "labels"
+os.makedirs(label_dir, exist_ok=True)
+
 
 def generate_image(prompt, steps):
     payload = {
@@ -71,8 +109,21 @@ def print_image(image):
         image.save(temp_file_path, "PNG")
         
     # Construct the print command
-    command = f"brother_ql -b pyusb --model QL-570 -p usb://0x04f9:0x2028/000M6Z401370 print -l 62 \"{temp_file_path}\""
+    printer_ql750="0x2028"
+    printer_id1="000M6Z401370"
+
+    printer_QL550b="0x2016"
+    printer_ql500a="0x2015"
+    printer_id2="000M6Z401370"
     
+
+    command = f"brother_ql -b pyusb --model QL-570 -p usb://0x04f9:{printer_ql750}/{printer_id1} print -l 62 \"{temp_file_path}\""
+    #good
+    # command = f"brother_ql -b pyusb --model QL-500 -p usb://0x04f9:{printer_ql500a}/{printer_id2} print -l 62 \"{temp_file_path}\""
+    #badblink
+    # command = f"brother_ql -b pyusb --model QL-550 -p usb://0x04f9:{printer_QL550b} print -l 62 \"{temp_file_path}\""
+    
+    print(command)
     # Run the print command
     subprocess.run(command, shell=True)
 
@@ -99,39 +150,51 @@ st.title('STICKER FACTORY @ [TAMI](https://telavivmakers.org)')
 st.subheader(":printer: hard copies of images and text")
 
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Sticker", "Label", "Text2image", "Webcam","Cat" , "FAQ"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Sticker", "Label", "Text2image", "Webcam","Cat" ,"history", "FAQ"])
 
 #sticker
 with tab1:
-    st.subheader(":printer: a sticker")
+    st.subheader("Sticker")
 
-    uploaded_image = st.file_uploader("Choose an image file to :printer:", type=['png', 'jpg', 'gif'],)
+    # Allow the user to upload an image
+    uploaded_image = st.file_uploader("Choose an image file to print", type=['png', 'jpg', 'gif'])
 
+    # Initialize a variable for the image to be processed
+    image_to_process = None
+
+    # Check if an image has been uploaded
     if uploaded_image is not None:
-        original_image = Image.open(uploaded_image).convert('RGB')
+        image_to_process = Image.open(uploaded_image).convert('RGB')
+
+    # Alternatively, check if an image has been selected from the gallery
+    elif 'selected_image_path' in st.session_state:
+        image_to_process = Image.open(st.session_state['selected_image_path'])
+
+    # If an image is ready to be processed (either uploaded or selected from the gallery)
+    if image_to_process is not None:
         # Get the original filename without extension
-        original_filename_without_extension = os.path.splitext(uploaded_image.name)[0]
-        grayimage = add_white_background_and_convert_to_grayscale(original_image)
+        # For gallery images, you might need a different approach to get a meaningful filename
+        original_filename_without_extension = os.path.splitext(uploaded_image.name)[0] if uploaded_image else "selected_image"
+
+        grayimage = add_white_background_and_convert_to_grayscale(image_to_process)
         resized_image, dithered_image = resize_and_dither(grayimage)
         
-        st.image(original_image, caption="Original Image")
+        st.image(image_to_process, caption="Original Image")
         st.image(dithered_image, caption="Resized and Dithered Image")
-
 
         # Paths to save the original and dithered images in the 'temp' directory with postfix
         original_image_path = os.path.join('temp', original_filename_without_extension + '_original.png')
         dithered_image_path = os.path.join('temp', original_filename_without_extension + '_dithered.png')
 
         # Save both original and dithered images
-        original_image.save(original_image_path, "PNG")
+        image_to_process.save(original_image_path, "PNG")
         dithered_image.save(dithered_image_path, "PNG")
-        
 
         # print options
         colc, cold = st.columns(2)
         with colc:
             if st.button('Print Original Image'):
-                print_image(original_image)
+                print_image(image_to_process)
                 st.success('Original image sent to printer!')
         with cold:
             if st.button('Print Dithered Image'):
@@ -141,7 +204,7 @@ with tab1:
         cole, colf = st.columns(2)
         with cole:
             if st.button('Print Original+rotated Image'):
-                rotated_org_image = rotate_image(original_image, 90)
+                rotated_org_image = rotate_image(image_to_process, 90)
                 print_image(rotated_org_image)
                 st.success('Original+rotated image sent to printer!')
 
@@ -150,6 +213,7 @@ with tab1:
                 rotated_image = rotate_image(dithered_image, 90)
                 print_image(rotated_image)
                 st.success('Dithered+rotated image sent to printer!')
+
 
 
 #label
@@ -194,8 +258,8 @@ with tab2:
 
     # Multiline Text Input
     text = st.text_area("Enter your text to print","write something", height=200)
-
-    if text:                                                                                                                                                
+    # Check if the text has been changed by the user
+    if text:                                                                                                                                           
         urls = find_url(text)
         if urls:
             st.success("Found URLs: we might automate the QR code TODO")                                                                                                                        
@@ -255,7 +319,14 @@ with tab2:
 
             d.text((x, y), line, font=fnt, fill=(0, 0, 0))
             y += text_height + line_spacing  # Move down based on text height and line spacing
-
+        
+        # Save the label image
+        if text != "write something":
+            filename = safe_filename(text)
+            file_path = os.path.join(label_dir, filename)
+            img.save(file_path, "PNG")
+            st.success(f"Label saved as {filename}")
+        
 
 
 
@@ -357,12 +428,6 @@ with tab4:
                     st.success('image sent to printer!')
 
 # cat
-import requests
-import io
-from PIL import Image
-import streamlit as st
-
-
 
 with tab5:
     st.subheader(":printer: a cat")
@@ -373,7 +438,7 @@ with tab5:
         caturl = "https://api.thecatapi.com/v1/images/search"
 
         # Fetch JSON data
-        api_url = f"{caturl}?limit=1&api_key={api_key}"
+        api_url = f"{caturl}?limit=1&type=static&api_key={api_key}"
         response = requests.get(api_url)
         data = response.json()
 
@@ -390,8 +455,24 @@ with tab5:
         # Your print logic here
         print_image(dithered_image)
 
-# faq
+#histroy
 with tab6:
+    st.subheader("Gallery of Last 15 Labels and Stickers")
+    saved_images = list_saved_images()
+    
+    for i, image_path in enumerate(saved_images):
+        cols = st.columns([1, 3])
+        with cols[0]:
+            if st.button(f"Select #{i}", key=f"btn_{i}"):  # Unique key for each button
+                st.session_state['selected_image_path'] = image_path
+                st.success('image selected, goto **Sticker** tab for further processing and printing')
+
+        with cols[1]:
+            image = Image.open(image_path)
+            st.image(image, use_column_width=True)
+                
+# faq
+with tab7:
     st.subheader("FAQ:")
     st.markdown(
         '''
