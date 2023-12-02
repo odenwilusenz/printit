@@ -157,7 +157,7 @@ with tab1:
     st.subheader("Sticker")
 
     # Allow the user to upload an image
-    uploaded_image = st.file_uploader("Choose an image file to print", type=['png', 'jpg', 'gif'])
+    uploaded_image = st.file_uploader("Choose an image file to print", type=['png', 'jpg', 'gif', 'webp'])
 
     # Initialize a variable for the image to be processed
     image_to_process = None
