@@ -8,6 +8,15 @@ import tempfile
 import hashlib
 from datetime import datetime
 import time
+import txt2img_util
+
+# Access the current query parameters
+query_params = st.experimental_get_query_params()
+
+# Check if the 'copies' parameter exists
+# add to url "?copies=25"
+copies = int(query_params.get("copies", [1])[0])  # Default to 1 copy if not specified
+
 
 # Function to list the last 15 saved images, excluding those ending with "dithered"
 def list_saved_images(directories=["temp", "labels"]):
@@ -59,18 +68,20 @@ os.makedirs(label_dir, exist_ok=True)
 
 
 def generate_image(prompt, steps):
-    payload = {
-        "prompt": prompt,
-        "steps": 16,
-        "width": 696
-    }
+    txt2img = txt2img_util.txt2img()
+    return txt2img.generate(prompt)
+    # payload = {
+    #     "prompt": prompt,
+    #     "steps": 16,
+    #     "width": 696
+    # }
     
-    response = requests.post(url=f'https://y7bbzpsxx1vt.share.zrok.io/sdapi/v1/txt2img', json=payload)
-    r = response.json()
+    # response = requests.post(url=f'https://y7bbzpsxx1vt.share.zrok.io/sdapi/v1/txt2img', json=payload)
+    # r = response.json()
     
-    for i in r['images']:
-        image = Image.open(io.BytesIO(base64.b64decode(i.split(",",1)[0])))
-        return image
+    # for i in r['images']:
+    #     image = Image.open(io.BytesIO(base64.b64decode(i.split(",",1)[0])))
+    #     return image
     
 def add_white_background_and_convert_to_grayscale(image):
     # Check if the image has transparency (an alpha channel)
@@ -125,7 +136,9 @@ def print_image(image):
     
     print(command)
     # Run the print command
-    subprocess.run(command, shell=True)
+    for _ in range(copies):
+        # st.balloons()
+        subprocess.run(command, shell=True)
 
 def find_url(string):
     url_pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
@@ -386,17 +399,31 @@ with tab3:
     st.subheader(":printer: image from text")
     st.write("using tami stable diffusion bot")
     prompt = st.text_input("Enter a prompt")
-    if prompt and prompt != st.session_state.last_prompt:
+    if prompt:
         print("generating image from prompt: " + prompt)
         generatedImage = generate_image(prompt, 20)
         resized_image, dithered_image = resize_and_dither(generatedImage)
-        st.image(resized_image, caption="Original Image")
-        st.image(dithered_image, caption="Resized and Dithered Image")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.image(resized_image, caption="Original Image")
+        with col2:
+            st.image(dithered_image, caption="Resized and Dithered Image")
         slugprompt = slugify.slugify(prompt)
         original_image_path = os.path.join('temp', "txt2img_" + slugprompt + '.png')
         generatedImage.save(original_image_path, "PNG")         #save image
-        print_image(dithered_image)
-
+        
+        
+        col3, col4 = st.columns(2)
+        with col3:
+            if st.button('Print Original Image'):
+                print_image(resized_image)
+                st.success('Original image sent to printer!')
+        with col4:
+            if st.button('Print Dithered Image'):
+                print_image(dithered_image)
+                st.success('Dithered image sent to printer!')
+        # print_image(dithered_image)
+        
         # Update last prompt
         st.session_state.last_prompt = prompt
 
