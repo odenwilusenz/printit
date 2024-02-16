@@ -114,3 +114,4 @@ venv.bak/
 .streamlit/config.toml
 .streamlit/secrets.toml
 /labels
+/cats
