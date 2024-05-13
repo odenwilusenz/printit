@@ -1,6 +1,5 @@
-brother_ql
-bottle
-jinja2
 streamlit
 flask
 pillow
+brother-ql-inventree @ git+https://github.com/matmair/brother_ql-inventree@master
+

@@ -10,12 +10,10 @@ from datetime import datetime
 import time
 import txt2img_util
 
-# Access the current query parameters
-query_params = st.experimental_get_query_params()
 
 # Check if the 'copies' parameter exists
 # add to url "?copies=25"
-copies = int(query_params.get("copies", [1])[0])  # Default to 1 copy if not specified
+copies = int(st.query_params.get("copies", [1])[0])  # Default to 1 copy if not specified
 
 
 # Function to list the last 15 saved images, excluding those ending with "dithered"
@@ -127,8 +125,11 @@ def print_image(image):
     printer_ql500a="0x2015"
     printer_id2="000M6Z401370"
     
+    label = 62
+    label_red = "62red"
 
-    command = f"brother_ql -b pyusb --model QL-570 -p usb://0x04f9:{printer_ql750}/{printer_id1} print -l 62 \"{temp_file_path}\""
+    command = f"brother_ql -b pyusb --model QL-570 -p usb://0x04f9:{printer_ql750}/{printer_id1} print -l {label} \"{temp_file_path}\""
+    # -r 90
     #good
     # command = f"brother_ql -b pyusb --model QL-500 -p usb://0x04f9:{printer_ql500a}/{printer_id2} print -l 62 \"{temp_file_path}\""
     #badblink
@@ -455,7 +456,6 @@ with tab4:
                     st.success('image sent to printer!')
 
 # cat
-
 with tab5:
     st.subheader(":printer: a cat")
     st.caption("from the fine folks at https://thecatapi.com/")
