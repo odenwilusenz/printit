@@ -8,7 +8,6 @@ import tempfile
 import hashlib
 from datetime import datetime
 import time
-import txt2img_util
 
 
 # Check if the 'copies' parameter exists
@@ -66,20 +65,20 @@ os.makedirs(label_dir, exist_ok=True)
 
 
 def generate_image(prompt, steps):
-    txt2img = txt2img_util.txt2img()
-    return txt2img.generate(prompt)
-    # payload = {
-    #     "prompt": prompt,
-    #     "steps": 16,
-    #     "width": 696
-    # }
+    payload = {
+        "prompt": prompt,
+        "steps": steps,
+        "width": 696
+    }
+    url = "http://pop-os:7860"
+
+    response = requests.post(url=f'{url}/sdapi/v1/txt2img', json=payload)
+
+    r = response.json()
     
-    # response = requests.post(url=f'https://y7bbzpsxx1vt.share.zrok.io/sdapi/v1/txt2img', json=payload)
-    # r = response.json()
-    
-    # for i in r['images']:
-    #     image = Image.open(io.BytesIO(base64.b64decode(i.split(",",1)[0])))
-    #     return image
+    for i in r['images']:
+        image = Image.open(io.BytesIO(base64.b64decode(i.split(",",1)[0])))
+        return image
     
 def add_white_background_and_convert_to_grayscale(image):
     # Check if the image has transparency (an alpha channel)
