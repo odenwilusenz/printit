@@ -175,14 +175,18 @@ with tab1:
 
     # Initialize a variable for the image to be processed
     image_to_process = None
+    filename = None  # To hold the filename without extension
 
     # Check if an image has been uploaded
     if uploaded_image is not None:
         image_to_process = Image.open(uploaded_image).convert('RGB')
+        filename = os.path.splitext(uploaded_image.name)[0]
 
     # Alternatively, check if an image has been selected from the gallery
     elif 'selected_image_path' in st.session_state:
-        image_to_process = Image.open(st.session_state['selected_image_path'])
+        image_to_process = Image.open(st.session_state['selected_image_path']).convert('RGB')
+        filename = os.path.splitext(os.path.basename(st.session_state['selected_image_path']))[0]
+        # print(filename)
 
     # If an image is ready to be processed (either uploaded or selected from the gallery)
     if image_to_process is not None:
@@ -202,7 +206,8 @@ with tab1:
 
         # Save both original and dithered images
         image_to_process.save(original_image_path, "PNG")
-        dithered_image.save(dithered_image_path, "PNG")
+        # no need to save dithered image
+        # dithered_image.save(dithered_image_path, "PNG")
 
         # print options
         colc, cold = st.columns(2)
