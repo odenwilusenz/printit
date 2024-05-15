@@ -1,11 +1,10 @@
 import streamlit as st
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 import slugify
 import requests
 import io, base64, os, re
 import subprocess
 import tempfile
-import hashlib
 from datetime import datetime
 import time
 
@@ -76,8 +75,25 @@ def generate_image(prompt, steps):
 
     r = response.json()
     
-    for i in r['images']:
-        image = Image.open(io.BytesIO(base64.b64decode(i.split(",",1)[0])))
+    if r['images']:
+        first_image = r['images'][0]
+        base64_data = first_image.split("base64,")[1] if "base64," in first_image else first_image
+        image = Image.open(io.BytesIO(base64.b64decode(base64_data)))
+
+        png_payload = {
+            "image": "data:image/png;base64," + first_image
+        }
+        response2 = requests.post(url=f'{url}/sdapi/v1/png-info', json=png_payload)
+
+        # save image
+        pnginfo = PngImagePlugin.PngInfo()
+        info = response2.json().get("info")
+        if info:
+            pnginfo.add_text("parameters", info)
+        current_date = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        filename = os.path.join('temp', "txt2img_" + slugify.slugify(prompt) + ' ' + current_date + '.png')
+        image.save(filename, pnginfo=pnginfo)
+        
         return image
     
 def add_white_background_and_convert_to_grayscale(image):
@@ -128,11 +144,6 @@ def print_image(image):
     label_red = "62red"
 
     command = f"brother_ql -b pyusb --model QL-570 -p usb://0x04f9:{printer_ql750}/{printer_id1} print -l {label} \"{temp_file_path}\""
-    # -r 90
-    #good
-    # command = f"brother_ql -b pyusb --model QL-500 -p usb://0x04f9:{printer_ql500a}/{printer_id2} print -l 62 \"{temp_file_path}\""
-    #badblink
-    # command = f"brother_ql -b pyusb --model QL-550 -p usb://0x04f9:{printer_QL550b} print -l 62 \"{temp_file_path}\""
     
     print(command)
     # Run the print command
@@ -397,27 +408,40 @@ with tab2:
 #text2img
 # Streamlit reruns the script every time the user interacts with the page. 
 # To execute code only when a new prompt is entered, you need to keep track of the last prompt value
-if 'last_prompt' not in st.session_state:
-    st.session_state.last_prompt = None
+
+# Initialize the session state for the prompt and image
+if "prompt" not in st.session_state:
+    st.session_state.prompt = ""
+if "generated_image" not in st.session_state:
+    st.session_state.generated_image = None
+
+def submit():
+    st.session_state.prompt = st.session_state.widget
+    st.session_state.widget = ""
+    st.session_state.generated_image = None  # Reset the generated image when a new prompt is entered
 
 with tab3:
     st.subheader(":printer: image from text")
     st.write("using tami stable diffusion bot")
-    prompt = st.text_input("Enter a prompt")
-    if prompt:
-        print("generating image from prompt: " + prompt)
-        generatedImage = generate_image(prompt, 20)
-        resized_image, dithered_image = resize_and_dither(generatedImage)
+
+    st.text_input("Enter a prompt", key="widget", on_change=submit)
+    prompt = st.session_state.prompt
+
+    if prompt and st.session_state.generated_image is None:
+        st.write("Generating image from prompt: " + prompt)
+        generated_image = generate_image(prompt, 30)
+        st.session_state.generated_image = generated_image  # Store the generated image in session state
+
+    if st.session_state.generated_image:
+        generated_image = st.session_state.generated_image
+        resized_image, dithered_image = resize_and_dither(generated_image)
+
         col1, col2 = st.columns(2)
         with col1:
             st.image(resized_image, caption="Original Image")
         with col2:
             st.image(dithered_image, caption="Resized and Dithered Image")
-        slugprompt = slugify.slugify(prompt)
-        original_image_path = os.path.join('temp', "txt2img_" + slugprompt + '.png')
-        generatedImage.save(original_image_path, "PNG")         #save image
-        
-        
+
         col3, col4 = st.columns(2)
         with col3:
             if st.button('Print Original Image'):
@@ -427,10 +451,10 @@ with tab3:
             if st.button('Print Dithered Image'):
                 print_image(dithered_image)
                 st.success('Dithered image sent to printer!')
-        # print_image(dithered_image)
-        
-        # Update last prompt
-        st.session_state.last_prompt = prompt
+
+    # Update last prompt
+    st.session_state.last_prompt = prompt
+
 
 # webcam
 with tab4:
