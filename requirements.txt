@@ -1,5 +1,6 @@
 streamlit
 flask
 pillow
+slugify
 brother-ql-inventree @ git+https://github.com/matmair/brother_ql-inventree@master
 
