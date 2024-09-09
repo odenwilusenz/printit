@@ -2,5 +2,6 @@ streamlit
 flask
 pillow
 slugify
+qrcode
 brother-ql-inventree @ git+https://github.com/matmair/brother_ql-inventree@master
 
