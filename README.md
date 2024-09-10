@@ -92,9 +92,9 @@ curl -F "image=@${imagepath}" ${uri}
 
 ```
 
-we use the zrok.io to secure a static url. 
+we use the [zrok.io](https://docs.zrok.io/docs/guides/install/linux/) to secure a static url. 
 ```bash
-zrok reserve public --backend-mode proxy 4678
+zrok reserve public --backend-mode proxy 8988
 zrok share reserved kjvrml0bxatq
 ```
 you can also run a service for this. 
