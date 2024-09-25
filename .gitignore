@@ -1,6 +1,6 @@
 # ignore config.json
 config.json
-
+*.png
 ### Python template
 # Byte-compiled / optimized / DLL files
 __pycache__/

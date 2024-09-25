@@ -1,6 +1,5 @@
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
-import slugify
 import requests
 import io
 import base64
@@ -15,7 +14,6 @@ import qrcode
 # Check if the 'copies' parameter exists
 # add to url "?copies=25"
 copies = int(st.query_params.get("copies", [1])[0])  # Default to 1 copy if not specified
-
 
 # Function to list the last 15 saved images, excluding those ending with "dithered"
 def list_saved_images(directories=["temp", "labels"]):
@@ -34,7 +32,6 @@ def list_saved_images(directories=["temp", "labels"]):
     # Return the last 15 files
     return files[:15]
 
-
 # Function to find .ttf fonts
 def find_fonts():
     font_dirs = ["fonts", "/usr/share/fonts/"]
@@ -47,23 +44,17 @@ def find_fonts():
                         fonts.append(os.path.join(root, file))
     return fonts
 
-
 def safe_filename(text):
     # Sanitize the text to remove illegal characters and replace spaces with underscores
     sanitized_text = re.sub(r'[<>:"/\\|?*\n\r]+', '', text).replace(' ', '_')
-
     # Get the current time in epoch format
     epoch_time = int(time.time())
-
     # Return the filename
-    # return f"{sanitized_text}_{epoch_time}.png"
     return f"{epoch_time}_{sanitized_text}.png"
-
 
 # Ensure label directory exists
 label_dir = "labels"
 os.makedirs(label_dir, exist_ok=True)
-
 
 def generate_image(prompt, steps):
     payload = {
@@ -72,32 +63,55 @@ def generate_image(prompt, steps):
         "width": 696
     }
     url = "http://pop-os:7860"
+    url = "https://umcnrfui918x.zrok.yair.cc"
 
-    response = requests.post(url=f'{url}/sdapi/v1/txt2img', json=payload)
+    try:
+        response = requests.post(url=f'{url}/sdapi/v1/txt2img', json=payload)
+        
+        # Check if the request was successful
+        response.raise_for_status()
+        
+        # Print raw response content for debugging
+        print("Raw response content:", response.content)
+        
+        r = response.json()
 
-    r = response.json()
+        if r['images']:
+            first_image = r['images'][0]
+            base64_data = first_image.split("base64,")[1] if "base64," in first_image else first_image
+            image = Image.open(io.BytesIO(base64.b64decode(base64_data)))
 
-    if r['images']:
-        first_image = r['images'][0]
-        base64_data = first_image.split("base64,")[1] if "base64," in first_image else first_image
-        image = Image.open(io.BytesIO(base64.b64decode(base64_data)))
+            png_payload = {
+                "image": "data:image/png;base64," + first_image
+            }
+            response2 = requests.post(url=f'{url}/sdapi/v1/png-info', json=png_payload)
+            response2.raise_for_status()
 
-        png_payload = {
-            "image": "data:image/png;base64," + first_image
-        }
-        response2 = requests.post(url=f'{url}/sdapi/v1/png-info', json=png_payload)
+            # save image
+            pnginfo = PngImagePlugin.PngInfo()
+            info = response2.json().get("info")
+            if info:
+                pnginfo.add_text("parameters", str(info))
+            current_date = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            temp_dir = "temp"
+            os.makedirs(temp_dir, exist_ok=True)
+            filename = os.path.join(temp_dir, "txt2img_" + current_date + '.png')
+            image.save(filename, pnginfo=pnginfo)
 
-        # save image
-        pnginfo = PngImagePlugin.PngInfo()
-        info = response2.json().get("info")
-        if info:
-            pnginfo.add_text("parameters", info)
-        current_date = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        filename = os.path.join('temp', "txt2img_" + slugify.slugify(prompt) + ' ' + current_date + '.png')
-        image.save(filename, pnginfo=pnginfo)
+            return image
+        else:
+            print("No images found in the response")
+            return None
 
-        return image
-
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while making the request: {e}")
+        return None
+    except ValueError as e:
+        print(f"An error occurred while parsing the JSON response: {e}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return None
 
 def add_white_background_and_convert_to_grayscale(image):
     # Check if the image has transparency (an alpha channel)
@@ -125,6 +139,22 @@ def resize_and_dither(image):
     resized_grayscale_image = resized_image.convert("L")
 
     # Apply Floyd-Steinberg dithering
+    dithered_image = resized_grayscale_image.copy()
+    width, height = dithered_image.size
+
+    for y in range(height - 1):
+        for x in range(width - 1):
+            old_pixel = dithered_image.getpixel((x, y))
+            new_pixel = 255 if old_pixel > 127 else 0
+            error = old_pixel - new_pixel
+
+            dithered_image.putpixel((x, y), new_pixel)
+
+            # Distribute the error to neighboring pixels
+            dithered_image.putpixel((x + 1, y), dithered_image.getpixel((x + 1, y)) + error * 7 // 16)
+            dithered_image.putpixel((x - 1, y + 1), dithered_image.getpixel((x - 1, y + 1)) + error * 3 // 16)
+            dithered_image.putpixel((x, y + 1), dithered_image.getpixel((x, y + 1)) + error * 5 // 16)
+            dithered_image.putpixel((x + 1, y + 1), dithered_image.getpixel((x + 1, y + 1)) + error * 1 // 16)
 
     return resized_grayscale_image, dithered_image
 
@@ -135,12 +165,11 @@ def print_image(image):
         image.save(temp_file_path, "PNG")
 
     # Construct the print command
-    printer_ql750 = "0x2028"
+    # printer_ql750 = "0x2028"  # Commented out as it's unused
     printer_QL550b = "0x2016"
-    printer_ql500a = "0x2015"
+    # printer_ql500a = "0x2015"  # Commented out as it's unused
 
     printer_model = printer_QL550b
-    label_type = 62
     label_type = "62red"
 
     command = f"brother_ql -b pyusb --model QL-570 -p usb://0x04f9:{printer_model} print -l {label_type} \"{temp_file_path}\""
@@ -169,7 +198,6 @@ def img_concat_v(im1, im2):
 st.title('STICKER FACTORY @ [TAMI](https://telavivmakers.org)')
 
 st.subheader(":printer: hard copies of images and text")
-
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Sticker", "Label", "Text2image", "Webcam", "Cat", "history", "FAQ"])
 
@@ -239,7 +267,6 @@ with tab1:
                 rotated_image = rotate_image(dithered_image, 90)
                 print_image(rotated_image)
                 st.success('Dithered+rotated image sent to printer!')
-
 
 # label
 with tab2:
@@ -391,7 +418,6 @@ with tab2:
                 * on pc `ctrl+enter` will submit, on mobile click outside the `text_area` to process.
                 ''')
 
-
 # text2img
 # Streamlit reruns the script every time the user interacts with the page.
 # To execute code only when a new prompt is entered, you need to keep track of the last prompt value
@@ -441,7 +467,6 @@ with tab3:
 
     # Update last prompt
     st.session_state.last_prompt = prompt
-
 
 # webcam
 with tab4:
