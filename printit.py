@@ -2,12 +2,15 @@ import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 import slugify
 import requests
-import io, base64, os, re
+import io
+import base64
+import os
+import re
 import subprocess
 import tempfile
 from datetime import datetime
 import time
-
+import qrcode
 
 # Check if the 'copies' parameter exists
 # add to url "?copies=25"
@@ -21,7 +24,7 @@ def list_saved_images(directories=["temp", "labels"]):
         if os.path.exists(directory):
             files.extend([
                 os.path.join(directory, file) for file in os.listdir(directory)
-                if not file.endswith("dithered.png") and not file.endswith("dithered.jpg") and not file.endswith("dithered.gif") 
+                if not file.endswith("dithered.png") and not file.endswith("dithered.jpg") and not file.endswith("dithered.gif")
                 and file.endswith(('.png', '.jpg', '.gif'))
             ])
 
@@ -30,7 +33,6 @@ def list_saved_images(directories=["temp", "labels"]):
 
     # Return the last 15 files
     return files[:15]
-
 
 
 # Function to find .ttf fonts
@@ -55,7 +57,7 @@ def safe_filename(text):
 
     # Return the filename
     # return f"{sanitized_text}_{epoch_time}.png"
-    return f"{sanitized_text}.png"
+    return f"{epoch_time}_{sanitized_text}.png"
 
 
 # Ensure label directory exists
@@ -74,7 +76,7 @@ def generate_image(prompt, steps):
     response = requests.post(url=f'{url}/sdapi/v1/txt2img', json=payload)
 
     r = response.json()
-    
+
     if r['images']:
         first_image = r['images'][0]
         base64_data = first_image.split("base64,")[1] if "base64," in first_image else first_image
@@ -93,16 +95,17 @@ def generate_image(prompt, steps):
         current_date = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         filename = os.path.join('temp', "txt2img_" + slugify.slugify(prompt) + ' ' + current_date + '.png')
         image.save(filename, pnginfo=pnginfo)
-        
+
         return image
-    
+
+
 def add_white_background_and_convert_to_grayscale(image):
     # Check if the image has transparency (an alpha channel)
     if image.mode == 'RGBA':
         # Create a white background of the same size as the original image
         white_background = Image.new('RGBA', image.size, 'white')
         # Paste the original image onto the white background
-        white_background.paste(image, mask=image.split()[3]) # Using the alpha channel as the mask
+        white_background.paste(image, mask=image.split()[3])  # Using the alpha channel as the mask
         image = white_background
 
     # Convert the image to grayscale
@@ -122,8 +125,7 @@ def resize_and_dither(image):
     resized_grayscale_image = resized_image.convert("L")
 
     # Apply Floyd-Steinberg dithering
-    dithered_image = resized_grayscale_image.convert("1", dither=Image.FLOYDSTEINBERG)
-    
+
     return resized_grayscale_image, dithered_image
 
 def print_image(image):
@@ -131,20 +133,18 @@ def print_image(image):
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
         temp_file_path = temp_file.name
         image.save(temp_file_path, "PNG")
-        
+
     # Construct the print command
-    printer_ql750="0x2028"
-    printer_id1="000M6Z401370"
+    printer_ql750 = "0x2028"
+    printer_QL550b = "0x2016"
+    printer_ql500a = "0x2015"
 
-    printer_QL550b="0x2016"
-    printer_ql500a="0x2015"
-    printer_id2="000M6Z401370"
-    
-    label = 62
-    label_red = "62red"
+    printer_model = printer_QL550b
+    label_type = 62
+    label_type = "62red"
 
-    command = f"brother_ql -b pyusb --model QL-570 -p usb://0x04f9:{printer_ql750}/{printer_id1} print -l {label} \"{temp_file_path}\""
-    
+    command = f"brother_ql -b pyusb --model QL-570 -p usb://0x04f9:{printer_model} print -l {label_type} \"{temp_file_path}\""
+
     print(command)
     # Run the print command
     for _ in range(copies):
@@ -157,7 +157,7 @@ def find_url(string):
     return urls
 
 def img_concat_v(im1, im2):
-    image_width=696
+    image_width = 696
     dst = Image.new('RGB', (im1.width, im1.height + image_width))
     dst.paste(im1, (0, 0))
     im2 = im2.resize((image_width, image_width))
@@ -165,18 +165,15 @@ def img_concat_v(im1, im2):
     dst.paste(im2, (0, im1.height))
     return dst
 
-
-
-
 # Streamlit app
 st.title('STICKER FACTORY @ [TAMI](https://telavivmakers.org)')
 
 st.subheader(":printer: hard copies of images and text")
 
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Sticker", "Label", "Text2image", "Webcam","Cat" ,"history", "FAQ"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Sticker", "Label", "Text2image", "Webcam", "Cat", "history", "FAQ"])
 
-#sticker
+# sticker
 with tab1:
     st.subheader("Sticker")
 
@@ -206,7 +203,7 @@ with tab1:
 
         grayimage = add_white_background_and_convert_to_grayscale(image_to_process)
         resized_image, dithered_image = resize_and_dither(grayimage)
-        
+
         st.image(image_to_process, caption="Original Image")
         st.image(dithered_image, caption="Resized and Dithered Image")
 
@@ -244,8 +241,7 @@ with tab1:
                 st.success('Dithered+rotated image sent to printer!')
 
 
-
-#label
+# label
 with tab2:
     st.subheader(":printer: a label")
 
@@ -276,7 +272,7 @@ with tab2:
                 adjusted_lines.append(line)
 
             max_text_width = max([draw.textbbox((0, 0), line, font=font)[2] for line in adjusted_lines if line.strip()])
-            
+
             if max_text_width <= width:
                 max_font_size = size
             else:
@@ -284,25 +280,24 @@ with tab2:
 
         return max_font_size
 
-
     # Multiline Text Input
-    text = st.text_area("Enter your text to print","write something", height=200)
+    text = st.text_area("Enter your text to print", "write something", height=200)
     # Check if the text has been changed by the user
-    if text:                                                                                                                                           
+    if text:
         urls = find_url(text)
         if urls:
-            st.success("Found URLs: we might automate the QR code TODO")                                                                                                                        
+            st.success("Found URLs: we might automate the QR code TODO")
             for url in urls:
-                st.write(url)  
+                st.write(url)
 
         # init some font vars
         available_fonts = find_fonts()
-        font=available_fonts[0]
+        font = available_fonts[0]
         alignment = "center"
-        fnt = ImageFont.truetype(font, 20) # Initialize Font
-        max_size = calculate_max_font_size(696, text, font) 
+        fnt = ImageFont.truetype(font, 20)  # Initialize Font
+        max_size = calculate_max_font_size(696, text, font)
         font_size = max_size
-        
+
         fontstuff = st.checkbox("font settings", value=False)
         col1, col2 = st.columns(2)
         if fontstuff:
@@ -314,10 +309,10 @@ with tab2:
             with col2:
                 alignment_options = ["left", "center", "right"]
                 alignment = st.selectbox("Choose text alignment", alignment_options, index=1)
-            font_size = st.slider("Font Size", 5, max_size+5, max_size)
+            font_size = st.slider("Font Size", 5, max_size + 5, max_size)
             font_size
         # Font Size
-        fnt = ImageFont.truetype(font, font_size) # Initialize Font
+        fnt = ImageFont.truetype(font, font_size)  # Initialize Font
         line_spacing = 20  # Adjust this value to set the desired line spacing
 
         # Calculate the new image height based on the bounding boxes
@@ -325,7 +320,7 @@ with tab2:
 
         # Create Image
         y = 5  # Start from
-        img = Image.new("RGB", (696, new_image_height+10), color="white")
+        img = Image.new("RGB", (696, new_image_height + 10), color="white")
         d = ImageDraw.Draw(img)
 
         # Draw Text
@@ -348,34 +343,27 @@ with tab2:
 
             d.text((x, y), line, font=fnt, fill=(0, 0, 0))
             y += text_height + line_spacing  # Move down based on text height and line spacing
-        
+
         # Save the label image
         if text != "write something":
             filename = safe_filename(text)
             file_path = os.path.join(label_dir, filename)
             img.save(file_path, "PNG")
             st.success(f"Label saved as {filename}")
-        
-
-
-
 
     # QR code
-
-
-    import qrcode
     qr = qrcode.QRCode(
         border=0
     )
 
     qrurl = st.text_input("add a QRcode to your sticker",)
     if qrurl:
-        #we have text generate qr
+        # we have text generate qr
         qr.add_data(qrurl)
         qr.make(fit=True)
         imgqr = qr.make_image(fill_color="black", back_color="white")
 
-        #save to image
+        # save to image
         # add random 4 letetrs to file name
         # letters = string.ascii_lowercase
         # random_string = ''.join(random.choice(letters) for i in range(4))
@@ -383,30 +371,29 @@ with tab2:
         # imgqr.save(qrimgpath, "PNG")
 
         if imgqr and img:
-            #add qr below the label
+            # add qr below the label
             imgqr = img_concat_v(img, imgqr)
             st.image(imgqr, use_column_width=True)
             if st.button('Print sticker+qr'):
-                    print_image(imgqr)
-        elif imgqr and not(img):
+                print_image(imgqr)
+        elif imgqr and not (img):
             # st.image(imgqr, use_column_width=True)
             if st.button('Print sticker'):
-                    print_image(imgqr)
+                print_image(imgqr)
 
-
-    if text and not(qrurl):
+    if text and not (qrurl):
         st.image(img, use_column_width=True)
         if st.button('Print sticker'):
-                print_image(img)  # Needs definition
-                st.success('sticker sent to printer')
+            print_image(img)  # Needs definition
+            st.success('sticker sent to printer')
     st.markdown('''
-                * label will automaticly resize to fit the longest line, so use linebreaks.   
+                * label will automaticly resize to fit the longest line, so use linebreaks.
                 * on pc `ctrl+enter` will submit, on mobile click outside the `text_area` to process.
                 ''')
 
 
-#text2img
-# Streamlit reruns the script every time the user interacts with the page. 
+# text2img
+# Streamlit reruns the script every time the user interacts with the page.
 # To execute code only when a new prompt is entered, you need to keep track of the last prompt value
 
 # Initialize the session state for the prompt and image
@@ -467,7 +454,7 @@ with tab4:
             # Get the original filename without extension
             grayimage = add_white_background_and_convert_to_grayscale(picture)
             resized_image, dithered_image = resize_and_dither(grayimage)
-            
+
             st.image(dithered_image, caption="Resized and Dithered Image")
 
             # print options
@@ -499,10 +486,10 @@ with tab5:
 
         # Extract image URL from JSON
         image_url = data[0]['url']
-        
+
         # Fetch the image
         image_response = requests.get(image_url)
-        img = Image.open(io.BytesIO(image_response.content))        
+        img = Image.open(io.BytesIO(image_response.content))
         # Display the image
         grayimage = add_white_background_and_convert_to_grayscale(img)
         resized_image, dithered_image = resize_and_dither(grayimage)
@@ -510,11 +497,11 @@ with tab5:
         # Your print logic here
         print_image(dithered_image)
 
-#histroy
+# histroy
 with tab6:
     st.subheader("Gallery of Last 15 Labels and Stickers")
     saved_images = list_saved_images()
-    
+
     for i, image_path in enumerate(saved_images):
         cols = st.columns([1, 3])
         with cols[0]:
@@ -525,20 +512,20 @@ with tab6:
         with cols[1]:
             image = Image.open(image_path)
             st.image(image, use_column_width=True)
-                
+
 # faq
 with tab7:
     st.subheader("FAQ:")
     st.markdown(
         '''
-        *dithering* is suggested (sometimes inforced) if source is not lineart as grayscale and color look bad at thermal printer  
-        
-        all uploaded images and generated labels are saved  
-        uploaded camera snapshot are NOT saved, only printed. 
+        *dithering* is suggested (sometimes inforced) if source is not lineart as grayscale and color look bad at thermal printer
+
+        all uploaded images and generated labels are saved
+        uploaded camera snapshot are NOT saved, only printed.
 
         app [code](https://github.com/5shekel/printit)
-        
+
         PRINT ALOT is the best!
         '''
-        )
+    )
     st.image(Image.open('assets/station_sm.jpg'), caption="TAMI printshop")
