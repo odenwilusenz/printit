@@ -164,12 +164,12 @@ def main():
             st.image(image_path, caption="", use_column_width=True)
 
         print_button_label = f"Print {print_choice} Image"
+        if print_choice == "Original" and dither:
+            print_button_label += ", Dithering"
         if rotate_checkbox:
             print_button_label += ", Rotated 90°"
         if mirror_checkbox:
             print_button_label += ", Mirrored"
-        if print_choice == "Original" and dither:
-            print_button_label += ", Dithering"
 
         if st.button(print_button_label):
             printer_info = find_and_parse_printer()
