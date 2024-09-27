@@ -11,6 +11,34 @@ from brother_ql.models import ModelsManager
 from brother_ql.backends.helpers import send
 from datetime import datetime
 
+def resize_image_to_width(image_path, output_path, target_width_mm, current_dpi):
+    # Convert mm to inches (since DPI is dots per inch)
+    target_width_inch = target_width_mm / 25.4
+
+    # Open the image
+    image = Image.open(image_path)
+
+    # Calculate the target pixel width using the given DPI
+    target_width_px = int(target_width_inch * current_dpi)
+
+    # Calculate the aspect ratio to maintain the original height/width ratio
+    aspect_ratio = image.height / image.width
+
+    # Calculate the new height based on the target width and aspect ratio
+    target_height_px = int(target_width_px * aspect_ratio)
+
+    # Resize the image while maintaining the aspect ratio
+    resized_image = image.resize((target_width_px, target_height_px), Image.LANCZOS)
+
+    # If the resized width is less than 696 pixels, pad with white
+    if target_width_px < 696:
+        new_image = Image.new("RGB", (696, target_height_px), (255, 255, 255))
+        new_image.paste(resized_image, ((696 - target_width_px) // 2, 0))
+        resized_image = new_image
+
+    # Save the resized image to the output path
+    resized_image.save(output_path)
+    print(f"Image resized to {resized_image.width}x{resized_image.height} pixels.")
 
 def apply_threshold(image, threshold):
     return image.point(lambda x: 255 if x > threshold else 0, mode='1')
@@ -59,7 +87,7 @@ def find_and_parse_printer():
 
     return None
 
-def print_label(printer_info, image_path, label_size, dither=False, rotate=0):
+def print_label(printer_info, image_path, label_size, dpi, dither=False, rotate=0):
     qlr = BrotherQLRaster(printer_info['model'])
     instructions = convert(
         qlr=qlr,
@@ -132,13 +160,21 @@ def main():
 
         with col1:
             image_path = "latest.png"
-            print_choice = st.radio("Choose which image to print/save:", ("Original", "Threshold", "Canny"))
+            print_choice = st.radio("Choose which image to print/save:", ("Original", "Threshold"))
 
             st.text("General options:")
             mirror_checkbox = st.checkbox("Mirror Mask", value=False)
 
-            rotate_checkbox = st.checkbox("rotate 90deg", value=False)
+            target_width_mm = st.number_input("Target Width (mm)", min_value=0, value=0)
+
+            rotate_disabled = target_width_mm > 0
+            rotate_checkbox = st.checkbox("rotate 90deg", value=False, disabled=rotate_disabled)
             rotate = 90 if rotate_checkbox else 0
+            if target_width_mm > 0:
+                current_dpi = 300  # st.number_input("Current DPI", min_value=1, value=300)
+                resized_image_path = os.path.join(temp_folder, f"resized_{new_filename}")
+                resize_image_to_width(original_image_path, resized_image_path, target_width_mm, current_dpi)
+                image = Image.open(resized_image_path)
 
             if mirror_checkbox:
                 image = mirror_image(image)
@@ -154,11 +190,11 @@ def main():
                 threshold_image = apply_threshold(image, threshold)
                 threshold_image.save(image_path)
 
-            elif print_choice == "Canny":
-                threshold_range = st.slider("Threshold Range", 0, 255, (100, 200))
-                threshold1, threshold2 = threshold_range
-                canny_image = apply_canny(image, threshold1, threshold2)
-                canny_image.save(image_path)
+            # elif print_choice == "Canny":
+            #     threshold_range = st.slider("Threshold Range", 0, 255, (100, 200))
+            #     threshold1, threshold2 = threshold_range
+            #     canny_image = apply_canny(image, threshold1, threshold2)
+            #     canny_image.save(image_path)
 
         with col2:
             st.image(image_path, caption="", use_column_width=True)
@@ -179,7 +215,7 @@ def main():
                 # st.success(f"Found printer: {printer_info['identifier']} using {printer_info['backend']} backend")
 
                 label_size = '62'
-                if print_label(printer_info, image_path, label_size, dither=dither, rotate=rotate):
+                if print_label(printer_info, image_path, label_size, dpi=current_dpi, dither=dither, rotate=rotate):
                     st.success("mask printed")
                 else:
                     st.error("Printing failed.")
