@@ -156,8 +156,7 @@ def generate_image(prompt, steps):
         print(f"An unexpected error occurred: {e}")
         return None
 
-def add_white_background_and_convert_to_grayscale(image):
-    # Check if the image has transparency (an alpha channel)
+def preper_image(image):
     if image.mode == 'RGBA':
         # Create a white background of the same size as the original image
         white_background = Image.new('RGBA', image.size, 'white')
@@ -165,40 +164,40 @@ def add_white_background_and_convert_to_grayscale(image):
         white_background.paste(image, mask=image.split()[3])  # Using the alpha channel as the mask
         image = white_background
 
-    # Convert the image to grayscale
-    return image.convert('L')
+    # Resize the image to a smaller dimension of 696 pixels while maintaining aspect ratio
+    width, height = image.size
+    target_size = 696
+    
+    if min(width, height) != target_size:
+        if width < height:
+            new_width = target_size
+            new_height = int((target_size / width) * height)
+        else:
+            new_height = target_size
+            new_width = int((target_size / height) * width)
+        image = image.resize((new_width, new_height))
 
-def rotate_image(image, angle):
-    return image.rotate(angle, expand=True)
-
-def resize_and_dither(image):
-    # Resize the image to 696 width while maintaining the aspect ratio
-    new_width = 696
-    aspect_ratio = image.width / image.height
-    new_height = int(new_width / aspect_ratio)
-    resized_image = image.resize((new_width, new_height), Image.LANCZOS)
-
-    # Convert the resized image to grayscale
-    resized_grayscale_image = resized_image.convert("L")
-
-    # Apply Floyd-Steinberg dithering using PIL's built-in method
-    dithered_image = apply_dithering(resized_grayscale_image)
-
-    return resized_grayscale_image, dithered_image
-
-def apply_dithering(image):
     # Ensure the image is in grayscale mode
     if image.mode != 'L':
-        image = image.convert('L')
-    # Apply Floyd-Steinberg dithering
-    dithered_image = image.convert('1', dither=Image.FLOYDSTEINBERG)
-    return dithered_image
+        grayscale_image = image.convert('L')
+    else:
+        grayscale_image = image
 
-def print_image(image):
+    # Apply Floyd-Steinberg dithering
+    dithered_image = grayscale_image.convert('1', dither=Image.FLOYDSTEINBERG)
+    
+    return grayscale_image, dithered_image
+
+def print_image(image, rotate=0, dither=False):
+    # Ensure the temporary directory exists
+    temp_dir = tempfile.gettempdir()
+    os.makedirs(temp_dir, exist_ok=True)
+    
     # Save the image to a temporary file
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False, dir=temp_dir) as temp_file:
         temp_file_path = temp_file.name
         image.save(temp_file_path, "PNG")
+        print(f"Image saved to: {temp_file_path}")  # Print the full path
 
     # Use find_and_parse_printer to get printer information
     printer_info = find_and_parse_printer()
@@ -210,18 +209,12 @@ def print_image(image):
     command = f"brother_ql -b {printer_info['backend']} --model {printer_info['model']} -p {printer_info['identifier']} print -l {label_type} \"{temp_file_path}\""
     print(command)  # Log the command to standard output
 
-    # Print the label using the print_label function
-    for _ in range(copies):
-        success = print_label(printer_info, temp_file_path, label_type, dpi=300, dither=True, rotate=0)
-        if not success:
-            st.error("Failed to print the label. Please check the printer and try again.")
-
-def print_label(printer_info, image_path, label_size, dpi, dither=False, rotate=0):
+    # Prepare the image for printing
     qlr = BrotherQLRaster(printer_info['model'])
     instructions = convert(
         qlr=qlr,
-        images=[image_path],
-        label=label_size,
+        images=[temp_file_path],
+        label=label_type,
         rotate=rotate,
         threshold=0,
         dither=dither,
@@ -232,14 +225,19 @@ def print_label(printer_info, image_path, label_size, dpi, dither=False, rotate=
         cut=True
     )
 
-    try:
-        return send(instructions=instructions, printer_identifier=printer_info['identifier'], backend_identifier='pyusb')
-    except usb.core.USBError as e:
-        if "timeout error" in str(e):
-            print("USB timeout error occurred, but it's okay.")
-            return True
-        print(f"USBError encountered: {e}")
-        return False
+    # Print the label using the prepared instructions
+    for _ in range(copies):
+        try:
+            success = send(instructions=instructions, printer_identifier=printer_info['identifier'], backend_identifier='pyusb')
+            if not success:
+                st.error("Failed to print the label. Please check the printer and try again.")
+        except usb.core.USBError as e:
+            if "timeout error" in str(e):
+                print("USB timeout error occurred, but it's okay.")
+                return True
+            print(f"USBError encountered: {e}")
+            st.error(f"USBError encountered: {e}")
+            return False
 
 def find_url(string):
     url_pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
@@ -275,59 +273,42 @@ with tab1:
 
     # Check if an image has been uploaded
     if uploaded_image is not None:
+        # Convert the uploaded file to a PIL Image
         image_to_process = Image.open(uploaded_image).convert('RGB')
         filename = os.path.splitext(uploaded_image.name)[0]
 
-    # Alternatively, check if an image has been selected from the gallery
-    elif 'selected_image_path' in st.session_state:
-        image_to_process = Image.open(st.session_state['selected_image_path']).convert('RGB')
-        filename = os.path.splitext(os.path.basename(st.session_state['selected_image_path']))[0]
-        # print(filename)
-
-    # If an image is ready to be processed (either uploaded or selected from the gallery)
-    if image_to_process is not None:
         # Get the original filename without extension
         # For gallery images, you might need a different approach to get a meaningful filename
         original_filename_without_extension = os.path.splitext(uploaded_image.name)[0] if uploaded_image else "selected_image"
 
-        grayimage = add_white_background_and_convert_to_grayscale(image_to_process)
-        resized_image, dithered_image = resize_and_dither(grayimage)
+        # grayimage = add_white_background_and_convert_to_grayscale(image_to_process)
+        grayscale_image, dithered_image = preper_image(image_to_process)
 
         st.image(image_to_process, caption="Original Image")
         st.image(dithered_image, caption="Resized and Dithered Image")
 
         # Paths to save the original and dithered images in the 'temp' directory with postfix
         original_image_path = os.path.join('temp', original_filename_without_extension + '_original.png')
-        dithered_image_path = os.path.join('temp', original_filename_without_extension + '_dithered.png')
 
-        # Save both original and dithered images
+        # Save original image
         image_to_process.save(original_image_path, "PNG")
-        # no need to save dithered image
-        # dithered_image.save(dithered_image_path, "PNG")
 
         # print options
         colc, cold = st.columns(2)
         with colc:
             if st.button('Print Original Image'):
-                print_image(image_to_process)
-                st.success('Original image sent to printer!')
+                print_image(image_to_process, rotate=0)
         with cold:
             if st.button('Print Dithered Image'):
-                print_image(dithered_image)
-                st.success('Dithered image sent to printer!')
+                print_image(image_to_process, rotate=0, dither=True)
 
         cole, colf = st.columns(2)
         with cole:
             if st.button('Print Original+rotated Image'):
-                rotated_org_image = rotate_image(image_to_process, 90)
-                print_image(rotated_org_image)
-                st.success('Original+rotated image sent to printer!')
-
+                print_image(image_to_process, rotate=90)
         with colf:
             if st.button('Print dithered+rotated Image'):
-                rotated_image = rotate_image(dithered_image, 90)
-                print_image(rotated_image)
-                st.success('Dithered+rotated image sent to printer!')
+                print_image(image_to_process, rotate=90, dither=True)
 
 # label
 with tab2:
@@ -508,22 +489,22 @@ with tab3:
 
     if st.session_state.generated_image:
         generated_image = st.session_state.generated_image
-        resized_image, dithered_image = resize_and_dither(generated_image)
+        grayscale_image, dithered_image = preper_image(generated_image)
 
         col1, col2 = st.columns(2)
         with col1:
-            st.image(resized_image, caption="Original Image")
+            st.image(grayscale_image, caption="Original Image")
         with col2:
             st.image(dithered_image, caption="Resized and Dithered Image")
 
         col3, col4 = st.columns(2)
         with col3:
             if st.button('Print Original Image'):
-                print_image(resized_image)
+                print_image(grayscale_image)
                 st.success('Original image sent to printer!')
         with col4:
             if st.button('Print Dithered Image'):
-                print_image(dithered_image)
+                print_image(grayscale_image, dither=True)
                 st.success('Dithered image sent to printer!')
 
     # Update last prompt
@@ -537,9 +518,7 @@ with tab4:
         picture = st.camera_input("Take a picture")
         if picture is not None:
             picture = Image.open(picture).convert('RGB')
-            # Get the original filename without extension
-            grayimage = add_white_background_and_convert_to_grayscale(picture)
-            resized_image, dithered_image = resize_and_dither(grayimage)
+            grayscale_image, dithered_image = preper_image(picture)
 
             st.image(dithered_image, caption="Resized and Dithered Image")
 
@@ -547,13 +526,12 @@ with tab4:
             colc, cold = st.columns(2)
             with colc:
                 if st.button('Print rotated Image'):
-                    rotated_image = rotate_image(dithered_image, 90)
-                    print_image(rotated_image)
+                    print_image(grayscale_image, rotate=90, dither=True)
                     st.balloons()
                     st.success('rotated image sent to printer!')
             with cold:
                 if st.button('Print Image'):
-                    print_image(dithered_image)
+                    print_image(grayscale_image, dither=True)
                     st.success('image sent to printer!')
 
 # cat
@@ -577,11 +555,10 @@ with tab5:
         image_response = requests.get(image_url)
         img = Image.open(io.BytesIO(image_response.content))
         # Display the image
-        grayimage = add_white_background_and_convert_to_grayscale(img)
-        resized_image, dithered_image = resize_and_dither(grayimage)
+        grayscale_image, dithered_image = preper_image(img)
         st.image(img, caption="Fetched Cat Image")
         # Your print logic here
-        print_image(dithered_image)
+        print_image(grayscale_image, dither=True)
 
 # histroy
 with tab6:
