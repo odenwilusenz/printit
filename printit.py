@@ -5,13 +5,16 @@ import io
 import base64
 import os
 import re
-import subprocess
 import tempfile
 from datetime import datetime
 import time
 import qrcode
 from brother_ql.models import ModelsManager
 from brother_ql.backends import backend_factory
+from brother_ql.raster import BrotherQLRaster
+from brother_ql.conversion import convert
+from brother_ql.backends.helpers import send
+import usb.core
 
 label_type = "62red"
 
@@ -203,14 +206,40 @@ def print_image(image):
         st.error("No Brother QL printer found. Please check the connection and try again.")
         return
 
-    # Construct the print command
+    # Construct the print command for logging
     command = f"brother_ql -b {printer_info['backend']} --model {printer_info['model']} -p {printer_info['identifier']} print -l {label_type} \"{temp_file_path}\""
+    print(command)  # Log the command to standard output
 
-    print(command)
-    # Run the print command
+    # Print the label using the print_label function
     for _ in range(copies):
-        # st.balloons()
-        subprocess.run(command, shell=True)
+        success = print_label(printer_info, temp_file_path, label_type, dpi=300, dither=True, rotate=0)
+        if not success:
+            st.error("Failed to print the label. Please check the printer and try again.")
+
+def print_label(printer_info, image_path, label_size, dpi, dither=False, rotate=0):
+    qlr = BrotherQLRaster(printer_info['model'])
+    instructions = convert(
+        qlr=qlr,
+        images=[image_path],
+        label=label_size,
+        rotate=rotate,
+        threshold=0,
+        dither=dither,
+        compress=False,
+        red=False,
+        dpi_600=False,
+        hq=True,
+        cut=True
+    )
+
+    try:
+        return send(instructions=instructions, printer_identifier=printer_info['identifier'], backend_identifier='pyusb')
+    except usb.core.USBError as e:
+        if "timeout error" in str(e):
+            print("USB timeout error occurred, but it's okay.")
+            return True
+        print(f"USBError encountered: {e}")
+        return False
 
 def find_url(string):
     url_pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
