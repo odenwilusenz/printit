@@ -170,6 +170,10 @@ def main():
             rotate_disabled = target_width_mm > 0
             rotate_checkbox = st.checkbox("rotate 90deg", value=False, disabled=rotate_disabled)
             rotate = 90 if rotate_checkbox else 0
+
+            # Define current_dpi with a default value
+            current_dpi = 300
+
             if target_width_mm > 0:
                 current_dpi = 300  # st.number_input("Current DPI", min_value=1, value=300)
                 resized_image_path = os.path.join(temp_folder, f"resized_{new_filename}")
@@ -190,12 +194,6 @@ def main():
                 threshold_image = apply_threshold(image, threshold)
                 threshold_image.save(image_path)
 
-            # elif print_choice == "Canny":
-            #     threshold_range = st.slider("Threshold Range", 0, 255, (100, 200))
-            #     threshold1, threshold2 = threshold_range
-            #     canny_image = apply_canny(image, threshold1, threshold2)
-            #     canny_image.save(image_path)
-
         with col2:
             st.image(image_path, caption="", use_column_width=True)
 
@@ -212,8 +210,6 @@ def main():
             if not printer_info:
                 st.error("No Brother QL printer found. Please check the connection and try again.")
             else:
-                # st.success(f"Found printer: {printer_info['identifier']} using {printer_info['backend']} backend")
-
                 label_size = '62'
                 if print_label(printer_info, image_path, label_size, dpi=current_dpi, dither=dither, rotate=rotate):
                     st.success("mask printed")
