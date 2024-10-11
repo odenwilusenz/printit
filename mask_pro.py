@@ -44,7 +44,7 @@ def apply_threshold(image, threshold):
     # Ensure the image is in grayscale mode
     if image.mode != 'L':
         image = image.convert('L')
-    
+
     # Create a LUT with 256 entries
     lut = [255 if i > threshold else 0 for i in range(256)]
     return image.point(lut, mode='1')

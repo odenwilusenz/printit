@@ -67,13 +67,13 @@ def generate_image(prompt, steps):
 
     try:
         response = requests.post(url=f'{url}/sdapi/v1/txt2img', json=payload)
-        
+
         # Check if the request was successful
         response.raise_for_status()
-        
+
         # Print raw response content for debugging
         print("Raw response content:", response.content)
-        
+
         r = response.json()
 
         if r['images']:
