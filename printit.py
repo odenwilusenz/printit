@@ -13,6 +13,9 @@ import qrcode
 from brother_ql.models import ModelsManager
 from brother_ql.backends import backend_factory
 
+label_type = "62red"
+
+
 def find_and_parse_printer():
     model_manager = ModelsManager()
 
@@ -30,7 +33,7 @@ def find_and_parse_printer():
             serial_number = parts[3]
             vendor_id, product_id = device_info.split(':')
 
-            model = 'QL-570' #default model
+            model = 'QL-570'  # default model
             for m in model_manager.iter_elements():
                 if m.product_id == int(product_id, 16):
                     model = m.identifier
@@ -175,25 +178,18 @@ def resize_and_dither(image):
     # Convert the resized image to grayscale
     resized_grayscale_image = resized_image.convert("L")
 
-    # Apply Floyd-Steinberg dithering
-    dithered_image = resized_grayscale_image.copy()
-    width, height = dithered_image.size
-
-    for y in range(height - 1):
-        for x in range(width - 1):
-            old_pixel = dithered_image.getpixel((x, y))
-            new_pixel = 255 if old_pixel > 127 else 0
-            error = old_pixel - new_pixel
-
-            dithered_image.putpixel((x, y), new_pixel)
-
-            # Distribute the error to neighboring pixels
-            dithered_image.putpixel((x + 1, y), dithered_image.getpixel((x + 1, y)) + error * 7 // 16)
-            dithered_image.putpixel((x - 1, y + 1), dithered_image.getpixel((x - 1, y + 1)) + error * 3 // 16)
-            dithered_image.putpixel((x, y + 1), dithered_image.getpixel((x, y + 1)) + error * 5 // 16)
-            dithered_image.putpixel((x + 1, y + 1), dithered_image.getpixel((x + 1, y + 1)) + error * 1 // 16)
+    # Apply Floyd-Steinberg dithering using PIL's built-in method
+    dithered_image = apply_dithering(resized_grayscale_image)
 
     return resized_grayscale_image, dithered_image
+
+def apply_dithering(image):
+    # Ensure the image is in grayscale mode
+    if image.mode != 'L':
+        image = image.convert('L')
+    # Apply Floyd-Steinberg dithering
+    dithered_image = image.convert('1', dither=Image.FLOYDSTEINBERG)
+    return dithered_image
 
 def print_image(image):
     # Save the image to a temporary file
@@ -208,8 +204,6 @@ def print_image(image):
         return
 
     # Construct the print command
-    label_type = "62red"
-
     command = f"brother_ql -b {printer_info['backend']} --model {printer_info['model']} -p {printer_info['identifier']} print -l {label_type} \"{temp_file_path}\""
 
     print(command)
