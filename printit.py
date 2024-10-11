@@ -10,6 +10,43 @@ import tempfile
 from datetime import datetime
 import time
 import qrcode
+from brother_ql.models import ModelsManager
+from brother_ql.backends import backend_factory
+
+def find_and_parse_printer():
+    model_manager = ModelsManager()
+
+    for backend_name in ['pyusb', 'linux_kernel']:
+        backend = backend_factory(backend_name)
+        for printer in backend['list_available_devices']():
+            identifier = printer['identifier']
+            parts = identifier.split('/')
+
+            if len(parts) < 4:
+                continue
+
+            protocol = parts[0]
+            device_info = parts[2]
+            serial_number = parts[3]
+            vendor_id, product_id = device_info.split(':')
+
+            model = 'QL-570' #default model
+            for m in model_manager.iter_elements():
+                if m.product_id == int(product_id, 16):
+                    model = m.identifier
+                    break
+
+            return {
+                'identifier': identifier,
+                'backend': backend_name,
+                'model': model,
+                'protocol': protocol,
+                'vendor_id': vendor_id,
+                'product_id': product_id,
+                'serial_number': serial_number
+            }
+
+    return None
 
 # Check if the 'copies' parameter exists
 # add to url "?copies=25"
@@ -164,15 +201,16 @@ def print_image(image):
         temp_file_path = temp_file.name
         image.save(temp_file_path, "PNG")
 
-    # Construct the print command
-    # printer_ql750 = "0x2028"  # Commented out as it's unused
-    printer_QL550b = "0x2016"
-    # printer_ql500a = "0x2015"  # Commented out as it's unused
+    # Use find_and_parse_printer to get printer information
+    printer_info = find_and_parse_printer()
+    if not printer_info:
+        st.error("No Brother QL printer found. Please check the connection and try again.")
+        return
 
-    printer_model = printer_QL550b
+    # Construct the print command
     label_type = "62red"
 
-    command = f"brother_ql -b pyusb --model QL-570 -p usb://0x04f9:{printer_model} print -l {label_type} \"{temp_file_path}\""
+    command = f"brother_ql -b {printer_info['backend']} --model {printer_info['model']} -p {printer_info['identifier']} print -l {label_type} \"{temp_file_path}\""
 
     print(command)
     # Run the print command
