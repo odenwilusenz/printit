@@ -41,7 +41,13 @@ def resize_image_to_width(image_path, output_path, target_width_mm, current_dpi)
     print(f"Image resized to {resized_image.width}x{resized_image.height} pixels.")
 
 def apply_threshold(image, threshold):
-    return image.point(lambda x: 255 if x > threshold else 0, mode='1')
+    # Ensure the image is in grayscale mode
+    if image.mode != 'L':
+        image = image.convert('L')
+    
+    # Create a LUT with 256 entries
+    lut = [255 if i > threshold else 0 for i in range(256)]
+    return image.point(lut, mode='1')
 
 def apply_canny(image, threshold1, threshold2):
     image_np = np.array(image)
