@@ -7,7 +7,8 @@ live at > https://eady3rrvez3u.zrok.yair.cc/
 
 it currntly a mini obsession. it can do a few things and more to come.   
  * print images (dithered as its a b/w thing)
- * print text
+ * print text/labels
+ * print masks for PCB DIY etching(!), use the transparent ones for best resualts
  * print text2image using stable diffusion API
 
 started as a fork of [brother_ql_web](https://github.com/pklaus/brother_ql_web) and his brother_ql [printer driver](https://github.com/matmair/brother_ql-inventree), this driver is maintained and developed by matmair 
