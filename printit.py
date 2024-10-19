@@ -14,10 +14,21 @@ from brother_ql.backends import backend_factory
 from brother_ql.raster import BrotherQLRaster
 from brother_ql.conversion import convert
 from brother_ql.backends.helpers import send
+from brother_ql import labels  # Import the labels module
 import usb.core
 
-label_type = "62red"
-target_size = 696  # Define the magic number as a variable
+label_type = "62red" # good for ql-[500-800] series (anyh 62mm wide)
+label_type = "102" # good for ql-1100 (any 100mm wide)
+
+
+def get_label_width(label_type):
+    label_definitions = labels.ALL_LABELS  # Assuming ALL_LABELS is the tuple containing label definitions
+    for label in label_definitions:
+        if label.identifier == label_type:
+            return label.dots_printable[0]  # Return only the width
+    raise ValueError(f"Label type {label_type} not found in label definitions")
+
+label_width = get_label_width(label_type)  # Use the width as label_width
 
 
 def find_and_parse_printer():
@@ -104,7 +115,7 @@ def generate_image(prompt, steps):
     payload = {
         "prompt": prompt,
         "steps": steps,
-        "width": target_size
+        "width": label_width
     }
     url = "http://pop-os:7860"
     url = "https://umcnrfui918x.zrok.yair.cc"
@@ -157,7 +168,7 @@ def generate_image(prompt, steps):
         print(f"An unexpected error occurred: {e}")
         return None
 
-def preper_image(image, target_size=target_size):
+def preper_image(image, label_width=label_width):
     if image.mode == 'RGBA':
         # Create a white background of the same size as the original image
         white_background = Image.new('RGBA', image.size, 'white')
@@ -165,16 +176,16 @@ def preper_image(image, target_size=target_size):
         white_background.paste(image, mask=image.split()[3])  # Using the alpha channel as the mask
         image = white_background
 
-    # Resize the image to a smaller dimension of target_size pixels while maintaining aspect ratio
+    # Resize the image to a smaller dimension of label_width pixels while maintaining aspect ratio
     width, height = image.size
     
-    if min(width, height) != target_size:
+    if min(width, height) != label_width:
         if width < height:
-            new_width = target_size
-            new_height = int((target_size / width) * height)
+            new_width = label_width
+            new_height = int((label_width / width) * height)
         else:
-            new_height = target_size
-            new_width = int((target_size / height) * width)
+            new_height = label_width
+            new_width = int((label_width / height) * width)
         image = image.resize((new_width, new_height))
 
     # Ensure the image is in grayscale mode
@@ -244,7 +255,7 @@ def find_url(string):
     urls = re.findall(url_pattern, string)
     return urls
 
-def img_concat_v(im1, im2, image_width=target_size):
+def img_concat_v(im1, im2, image_width=label_width):
     dst = Image.new('RGB', (im1.width, im1.height + image_width))
     dst.paste(im1, (0, 0))
     im2 = im2.resize((image_width, image_width))
@@ -368,7 +379,7 @@ with tab2:
         font = available_fonts[0]
         alignment = "center"
         fnt = ImageFont.truetype(font, 20)  # Initialize Font
-        max_size = calculate_max_font_size(target_size, text, font)
+        max_size = calculate_max_font_size(label_width, text, font)
         font_size = max_size
 
         fontstuff = st.checkbox("font settings", value=False)
@@ -393,7 +404,7 @@ with tab2:
 
         # Create Image
         y = 5  # Start from
-        img = Image.new("RGB", (target_size, new_image_height + 10), color="white")
+        img = Image.new("RGB", (label_width, new_image_height + 10), color="white")
         d = ImageDraw.Draw(img)
 
         # Draw Text
@@ -408,9 +419,9 @@ with tab2:
                 text_height = fnt.getbbox("x ")[3] - fnt.getbbox("x")[1]  # Use the height of an x as the height for empty lines
 
             if alignment == "center":
-                x = (target_size - text_width) // 2
+                x = (label_width - text_width) // 2
             elif alignment == "right":
-                x = target_size - text_width
+                x = label_width - text_width
             else:
                 x = 0
 
@@ -596,3 +607,4 @@ with tab7:
         '''
     )
     st.image(Image.open('assets/station_sm.jpg'), caption="TAMI printshop")
+
