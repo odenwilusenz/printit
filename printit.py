@@ -276,40 +276,45 @@ with tab1:
         # Convert the uploaded file to a PIL Image
         image_to_process = Image.open(uploaded_image).convert('RGB')
         filename = os.path.splitext(uploaded_image.name)[0]
-
+    
         # Get the original filename without extension
-        # For gallery images, you might need a different approach to get a meaningful filename
         original_filename_without_extension = os.path.splitext(uploaded_image.name)[0] if uploaded_image else "selected_image"
-
+    
         # grayimage = add_white_background_and_convert_to_grayscale(image_to_process)
         grayscale_image, dithered_image = preper_image(image_to_process)
-
-        st.image(image_to_process, caption="Original Image")
-        st.image(dithered_image, caption="Resized and Dithered Image")
-
+    
         # Paths to save the original and dithered images in the 'temp' directory with postfix
         original_image_path = os.path.join('temp', original_filename_without_extension + '_original.png')
 
+        # Create checkboxes for rotation and dithering (dither default to True) inline
+        col1, col2 = st.columns(2)
+        with col1:
+            dither_checkbox = st.checkbox('Dither - _use for high detail, true by default_', value=True)
+        with col2:
+            rotate_checkbox = st.checkbox('Rotate - _90 degrees_')
+    
+        # Determine the button text based on checkbox states
+        button_text = 'Print '
+        if rotate_checkbox:
+            button_text += 'Rotated '
+        if dither_checkbox:
+            button_text += 'Dithered '
+        button_text += 'Image'
+    
+        # Create a single button with dynamic text
+        if st.button(button_text):
+            rotate_value = 90 if rotate_checkbox else 0
+            dither_value = dither_checkbox
+            print_image(image_to_process, rotate=rotate_value, dither=dither_value)
+    
+        # Display image based on checkbox status
+        if dither_checkbox:
+            st.image(dithered_image, caption="Resized and Dithered Image")
+        else:
+            st.image(image_to_process, caption="Original Image")
+    
         # Save original image
         image_to_process.save(original_image_path, "PNG")
-
-        # print options
-        colc, cold = st.columns(2)
-        with colc:
-            if st.button('Print Original Image'):
-                print_image(image_to_process, rotate=0)
-        with cold:
-            if st.button('Print Dithered Image'):
-                print_image(image_to_process, rotate=0, dither=True)
-
-        cole, colf = st.columns(2)
-        with cole:
-            if st.button('Print Original+rotated Image'):
-                print_image(image_to_process, rotate=90)
-        with colf:
-            if st.button('Print dithered+rotated Image'):
-                print_image(image_to_process, rotate=90, dither=True)
-
 # label
 with tab2:
     st.subheader(":printer: a label")
