@@ -17,6 +17,7 @@ from brother_ql.backends.helpers import send
 import usb.core
 
 label_type = "62red"
+target_size = 696  # Define the magic number as a variable
 
 
 def find_and_parse_printer():
@@ -54,9 +55,9 @@ def find_and_parse_printer():
 
     return None
 
-# Check if the 'copies' parameter exists
-# add to url "?copies=25"
-copies = int(st.query_params.get("copies", [1])[0])  # Default to 1 copy if not specified
+# Check if the 'copy' parameter exists
+# add to url "?copy=25"
+copy = int(st.query_params.get("copy", [1])[0])  # Default to 1 copy if not specified
 
 # Function to list the last 15 saved images, excluding those ending with "dithered"
 def list_saved_images(directories=["temp", "labels"]):
@@ -103,7 +104,7 @@ def generate_image(prompt, steps):
     payload = {
         "prompt": prompt,
         "steps": steps,
-        "width": 696
+        "width": target_size
     }
     url = "http://pop-os:7860"
     url = "https://umcnrfui918x.zrok.yair.cc"
@@ -156,7 +157,7 @@ def generate_image(prompt, steps):
         print(f"An unexpected error occurred: {e}")
         return None
 
-def preper_image(image):
+def preper_image(image, target_size=target_size):
     if image.mode == 'RGBA':
         # Create a white background of the same size as the original image
         white_background = Image.new('RGBA', image.size, 'white')
@@ -164,9 +165,8 @@ def preper_image(image):
         white_background.paste(image, mask=image.split()[3])  # Using the alpha channel as the mask
         image = white_background
 
-    # Resize the image to a smaller dimension of 696 pixels while maintaining aspect ratio
+    # Resize the image to a smaller dimension of target_size pixels while maintaining aspect ratio
     width, height = image.size
-    target_size = 696
     
     if min(width, height) != target_size:
         if width < height:
@@ -226,7 +226,7 @@ def print_image(image, rotate=0, dither=False):
     )
 
     # Print the label using the prepared instructions
-    for _ in range(copies):
+    for _ in range(copy):
         try:
             success = send(instructions=instructions, printer_identifier=printer_info['identifier'], backend_identifier='pyusb')
             if not success:
@@ -244,8 +244,7 @@ def find_url(string):
     urls = re.findall(url_pattern, string)
     return urls
 
-def img_concat_v(im1, im2):
-    image_width = 696
+def img_concat_v(im1, im2, image_width=target_size):
     dst = Image.new('RGB', (im1.width, im1.height + image_width))
     dst.paste(im1, (0, 0))
     im2 = im2.resize((image_width, image_width))
@@ -369,7 +368,7 @@ with tab2:
         font = available_fonts[0]
         alignment = "center"
         fnt = ImageFont.truetype(font, 20)  # Initialize Font
-        max_size = calculate_max_font_size(696, text, font)
+        max_size = calculate_max_font_size(target_size, text, font)
         font_size = max_size
 
         fontstuff = st.checkbox("font settings", value=False)
@@ -394,7 +393,7 @@ with tab2:
 
         # Create Image
         y = 5  # Start from
-        img = Image.new("RGB", (696, new_image_height + 10), color="white")
+        img = Image.new("RGB", (target_size, new_image_height + 10), color="white")
         d = ImageDraw.Draw(img)
 
         # Draw Text
@@ -409,9 +408,9 @@ with tab2:
                 text_height = fnt.getbbox("x ")[3] - fnt.getbbox("x")[1]  # Use the height of an x as the height for empty lines
 
             if alignment == "center":
-                x = (696 - text_width) // 2
+                x = (target_size - text_width) // 2
             elif alignment == "right":
-                x = 696 - text_width
+                x = target_size - text_width
             else:
                 x = 0
 
