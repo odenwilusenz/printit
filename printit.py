@@ -680,6 +680,12 @@ with tab4:
 
             st.image(dithered_image, caption="Resized and Dithered Image")
 
+            # Save webcam image before printing
+            filename = safe_filename("webcam")
+            file_path = os.path.join(label_dir, filename)
+            picture.save(file_path, "PNG")
+            st.success(f"Webcam photo saved as {filename}")
+
             # print options
             colc, cold = st.columns(2)
             with colc:
