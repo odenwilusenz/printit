@@ -371,14 +371,24 @@ with tab2:
     def calculate_actual_image_height_with_empty_lines(text, font, line_spacing=10):
         draw = ImageDraw.Draw(Image.new("RGB", (1, 1), color="white"))  # Dummy image for calculation
         total_height = 0
+        
+        # Get font metrics for consistent spacing
+        ascent, descent = font.getmetrics()
+        font_height = ascent + descent
+        
         for line in text.split('\n'):
             if line.strip():  # Non-empty lines
+                # Use textbbox for more accurate measurements
                 bbox = draw.textbbox((0, 0), line, font=font)
-                text_height = bbox[3] - bbox[1]
+                text_height = max(bbox[3] - bbox[1], font_height)  # Use the larger of bbox height or font height
             else:  # Empty lines
-                text_height = font.getbbox("x")[3] - font.getbbox("x")[1]  # Use the height of 'x' as the height for empty lines
-            total_height += text_height + line_spacing  # Add line spacing
-        return total_height - line_spacing  # Remove the last line spacing
+                text_height = font_height
+                
+            total_height += text_height + line_spacing
+        
+        # Add padding at top and bottom
+        padding = 20
+        return total_height + (padding * 2)  # Add padding to total height
 
     # Function to calculate the maximum font size based on the width of the longest line
     def calculate_max_font_size(width, text, font_path, start_size=10, end_size=200, step=1):
@@ -445,21 +455,26 @@ with tab2:
         # Calculate the new image height based on the bounding boxes
         new_image_height = calculate_actual_image_height_with_empty_lines(text, fnt, line_spacing)
 
-        # Create Image
-        y = 5  # Start from
-        img = Image.new("RGB", (label_width, new_image_height + 10), color="white")
+        # Create Image with padding
+        padding = 20  # Consistent with the padding in calculate_actual_image_height
+        img = Image.new("RGB", (label_width, new_image_height), color="white")
         d = ImageDraw.Draw(img)
+
+        # Adjust starting y position to account for padding
+        y = padding  # Start from padding instead of 5
 
         # Draw Text
         for line in text.split('\n'):
-            text_width = 0  # Initialize to zero
+            text_width = 0
+            ascent, descent = fnt.getmetrics()
+            font_height = ascent + descent
 
             if line.strip():  # For non-empty lines
                 bbox = d.textbbox((0, y), line, font=fnt)
                 text_width = bbox[2] - bbox[0]
-                text_height = bbox[3] - bbox[1]
+                text_height = max(bbox[3] - bbox[1], font_height)
             else:  # For empty lines
-                text_height = fnt.getbbox("x ")[3] - fnt.getbbox("x")[1]  # Use the height of an x as the height for empty lines
+                text_height = font_height
 
             if alignment == "center":
                 x = (label_width - text_width) // 2
@@ -469,7 +484,7 @@ with tab2:
                 x = 0
 
             d.text((x, y), line, font=fnt, fill=(0, 0, 0))
-            y += text_height + line_spacing  # Move down based on text height and line spacing
+            y += text_height + line_spacing
 
         # Save the label image
         if text != "write something":
