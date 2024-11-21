@@ -2,6 +2,7 @@ import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 import requests
 import io
+import glob
 import base64
 import os
 import re
@@ -70,21 +71,39 @@ def find_and_parse_printer():
 copy = int(st.query_params.get("copy", [1])[0])  # Default to 1 copy if not specified
 
 # Function to list the last 15 saved images, excluding those ending with "dithered"
-def list_saved_images(directories=["temp", "labels"]):
-    files = []
-    for directory in directories:
-        if os.path.exists(directory):
-            files.extend([
-                os.path.join(directory, file) for file in os.listdir(directory)
-                if not file.endswith("dithered.png") and not file.endswith("dithered.jpg") and not file.endswith("dithered.gif")
-                and file.endswith(('.png', '.jpg', '.gif'))
-            ])
-
-    # Sort files by modification time in descending order
-    files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-
-    # Return the last 15 files
-    return files[:15]
+def list_saved_images():
+    # Get all image files from both temp and labels folders
+    temp_files = glob.glob(os.path.join('temp', '*.[pj][np][g]*'))
+    label_files = glob.glob(os.path.join('labels', '*.[pj][np][g]*'))
+    
+    # Combine all image files
+    image_files = temp_files + label_files
+    
+    # Create a dictionary to store the latest version of each base filename
+    unique_images = {}
+    
+    for image_path in image_files:
+        filename = os.path.basename(image_path)
+        
+        # Skip test labels containing "write_something"
+        if "write_something" in filename.lower():
+            continue
+            
+        # Simplified base_name extraction - just remove the extension
+        base_name = os.path.splitext(filename)[0]
+        
+        # If this base_name already exists, compare modification times
+        if base_name in unique_images:
+            existing_time = os.path.getmtime(unique_images[base_name])
+            current_time = os.path.getmtime(image_path)
+            
+            if current_time > existing_time:
+                unique_images[base_name] = image_path
+        else:
+            unique_images[base_name] = image_path
+    
+    # Sort by modification time (newest first)
+    return sorted(unique_images.values(), key=os.path.getmtime, reverse=True)[:15]
 
 # Function to find .ttf fonts
 def find_fonts():
@@ -323,6 +342,7 @@ with tab1:
     
         # Save original image
         image_to_process.save(original_image_path, "PNG")
+
 # label
 with tab2:
     st.subheader(":printer: a label")
@@ -573,21 +593,30 @@ with tab5:
         # Your print logic here
         print_image(grayscale_image, dither=True)
 
-# histroy
+# history tab
 with tab6:
     st.subheader("Gallery of Last 15 Labels and Stickers")
     saved_images = list_saved_images()
 
-    for i, image_path in enumerate(saved_images):
-        cols = st.columns([1, 3])
-        with cols[0]:
-            if st.button(f"Select #{i}", key=f"btn_{i}"):  # Unique key for each button
-                st.session_state['selected_image_path'] = image_path
-                st.success('image selected, goto **Sticker** tab for further processing and printing')
+    cols_per_row = 3
+    for i in range(0, len(saved_images), cols_per_row):
+        cols = st.columns(cols_per_row)
+        for j in range(cols_per_row):
+            idx = i + j
+            if idx < len(saved_images):
+                with cols[j]:
+                    image_path = saved_images[idx]
+                    image = Image.open(image_path)
+                    st.image(image, use_column_width=True)
+                    
+                    filename = os.path.basename(image_path)
+                    modified_time = datetime.fromtimestamp(os.path.getmtime(image_path)).strftime('%Y-%m-%d %H:%M')
+                    st.caption(f"{filename}\n{modified_time}")
+                    
+                    if st.button(f"Print", key=f"print_{idx}"):
+                        print_image(image, dither=True)
+                        st.success('Sent to printer!')
 
-        with cols[1]:
-            image = Image.open(image_path)
-            st.image(image, use_column_width=True)
 
 # faq
 with tab7:
