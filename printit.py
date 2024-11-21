@@ -19,14 +19,18 @@ from brother_ql import labels  # Import the labels module
 import usb.core
 
 label_type = st.secrets["label_type"]  # Get label type from secrets
-txt2img_url = st.secrets["txt2img_url"] # get txt2img url from secrets
+txt2img_url = st.secrets["txt2img_url"]  # get txt2img url from secrets
+
 
 def get_label_width(label_type):
-    label_definitions = labels.ALL_LABELS  # Assuming ALL_LABELS is the tuple containing label definitions
+    label_definitions = (
+        labels.ALL_LABELS
+    )  # Assuming ALL_LABELS is the tuple containing label definitions
     for label in label_definitions:
         if label.identifier == label_type:
             return label.dots_printable[0]  # Return only the width
     raise ValueError(f"Label type {label_type} not found in label definitions")
+
 
 label_width = get_label_width(label_type)  # Use the width as label_width
 
@@ -34,11 +38,11 @@ label_width = get_label_width(label_type)  # Use the width as label_width
 def find_and_parse_printer():
     model_manager = ModelsManager()
 
-    for backend_name in ['pyusb', 'linux_kernel']:
+    for backend_name in ["pyusb", "linux_kernel"]:
         backend = backend_factory(backend_name)
-        for printer in backend['list_available_devices']():
-            identifier = printer['identifier']
-            parts = identifier.split('/')
+        for printer in backend["list_available_devices"]():
+            identifier = printer["identifier"]
+            parts = identifier.split("/")
 
             if len(parts) < 4:
                 continue
@@ -46,64 +50,67 @@ def find_and_parse_printer():
             protocol = parts[0]
             device_info = parts[2]
             serial_number = parts[3]
-            vendor_id, product_id = device_info.split(':')
+            vendor_id, product_id = device_info.split(":")
 
-            model = 'QL-570'  # default model
+            model = "QL-570"  # default model
             for m in model_manager.iter_elements():
                 if m.product_id == int(product_id, 16):
                     model = m.identifier
                     break
 
             return {
-                'identifier': identifier,
-                'backend': backend_name,
-                'model': model,
-                'protocol': protocol,
-                'vendor_id': vendor_id,
-                'product_id': product_id,
-                'serial_number': serial_number
+                "identifier": identifier,
+                "backend": backend_name,
+                "model": model,
+                "protocol": protocol,
+                "vendor_id": vendor_id,
+                "product_id": product_id,
+                "serial_number": serial_number,
             }
 
     return None
+
 
 # Check if the 'copy' parameter exists
 # add to url "?copy=25"
 copy = int(st.query_params.get("copy", [1])[0])  # Default to 1 copy if not specified
 
+
 # Function to list the last 15 saved images, excluding those ending with "dithered"
 def list_saved_images():
     # Get all image files from both temp and labels folders
-    temp_files = glob.glob(os.path.join('temp', '*.[pj][np][g]*'))
-    label_files = glob.glob(os.path.join('labels', '*.[pj][np][g]*'))
-    
+    temp_files = glob.glob(os.path.join("temp", "*.[pj][np][g]*"))
+    label_files = glob.glob(os.path.join("labels", "*.[pj][np][g]*"))
+
     # Combine all image files
     image_files = temp_files + label_files
-    
+
     # Create a dictionary to store the latest version of each base filename
     unique_images = {}
-    
+
     for image_path in image_files:
         filename = os.path.basename(image_path)
-        
+
         # Skip test labels containing "write_something"
         if "write_something" in filename.lower():
             continue
-            
+
         # Simplified base_name extraction - just remove the extension
         base_name = os.path.splitext(filename)[0]
-        
+
         # If this base_name already exists, compare modification times
         if base_name in unique_images:
             existing_time = os.path.getmtime(unique_images[base_name])
             current_time = os.path.getmtime(image_path)
-            
+
             if current_time > existing_time:
                 unique_images[base_name] = image_path
         else:
             unique_images[base_name] = image_path
-    
+
     # Sort by modification time (newest first)
     return sorted(unique_images.values(), key=os.path.getmtime, reverse=True)[:15]
+
 
 # Function to find .ttf fonts
 def find_fonts():
@@ -115,14 +122,14 @@ def find_fonts():
         os.path.expanduser("~/Library/Fonts/"),  # macOS user fonts
         "/Library/Fonts/",  # macOS system fonts
     ]
-    
+
     fonts = []
     for dir in font_dirs:
         if os.path.exists(dir):
             # Walk through directory and subdirectories
             for root, _, files in os.walk(dir):
                 for file in files:
-                    if file.lower().endswith(('.ttf', '.otf')):  # Added .otf support
+                    if file.lower().endswith((".ttf", ".otf")):  # Added .otf support
                         try:
                             font_path = os.path.join(root, file)
                             # Verify it's a valid font by attempting to load it
@@ -131,32 +138,31 @@ def find_fonts():
                         except Exception:
                             # Skip invalid fonts
                             continue
-    
+
     # Remove duplicates while preserving order
     return list(dict.fromkeys(fonts))
 
+
 def safe_filename(text):
     # Sanitize the text to remove illegal characters and replace spaces with underscores
-    sanitized_text = re.sub(r'[<>:"/\\|?*\n\r]+', '', text).replace(' ', '_')
+    sanitized_text = re.sub(r'[<>:"/\\|?*\n\r]+', "", text).replace(" ", "_")
     # Get the current time in epoch format
     epoch_time = int(time.time())
     # Return the filename
     return f"{epoch_time}_{sanitized_text}.png"
 
+
 # Ensure label directory exists
 label_dir = "labels"
 os.makedirs(label_dir, exist_ok=True)
 
+
 def generate_image(prompt, steps):
-    payload = {
-        "prompt": prompt,
-        "steps": steps,
-        "width": label_width
-    }
- 
+    payload = {"prompt": prompt, "steps": steps, "width": label_width}
+
     try:
         # print(f'{txt2img_url}/sdapi/v1/txt2img') #debug
-        response = requests.post(url=f'{txt2img_url}/sdapi/v1/txt2img', json=payload)
+        response = requests.post(url=f"{txt2img_url}/sdapi/v1/txt2img", json=payload)
 
         # Check if the request was successful
         response.raise_for_status()
@@ -166,15 +172,19 @@ def generate_image(prompt, steps):
 
         r = response.json()
 
-        if r['images']:
-            first_image = r['images'][0]
-            base64_data = first_image.split("base64,")[1] if "base64," in first_image else first_image
+        if r["images"]:
+            first_image = r["images"][0]
+            base64_data = (
+                first_image.split("base64,")[1]
+                if "base64," in first_image
+                else first_image
+            )
             image = Image.open(io.BytesIO(base64.b64decode(base64_data)))
 
-            png_payload = {
-                "image": "data:image/png;base64," + first_image
-            }
-            response2 = requests.post(url=f'{txt2img_url}/sdapi/v1/png-info', json=png_payload)
+            png_payload = {"image": "data:image/png;base64," + first_image}
+            response2 = requests.post(
+                url=f"{txt2img_url}/sdapi/v1/png-info", json=png_payload
+            )
             response2.raise_for_status()
 
             # save image
@@ -182,10 +192,10 @@ def generate_image(prompt, steps):
             info = response2.json().get("info")
             if info:
                 pnginfo.add_text("parameters", str(info))
-            current_date = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             temp_dir = "temp"
             os.makedirs(temp_dir, exist_ok=True)
-            filename = os.path.join(temp_dir, "txt2img_" + current_date + '.png')
+            filename = os.path.join(temp_dir, "txt2img_" + current_date + ".png")
             image.save(filename, pnginfo=pnginfo)
 
             return image
@@ -203,17 +213,20 @@ def generate_image(prompt, steps):
         print(f"An unexpected error occurred: {e}")
         return None
 
+
 def preper_image(image, label_width=label_width):
-    if image.mode == 'RGBA':
+    if image.mode == "RGBA":
         # Create a white background of the same size as the original image
-        white_background = Image.new('RGBA', image.size, 'white')
+        white_background = Image.new("RGBA", image.size, "white")
         # Paste the original image onto the white background
-        white_background.paste(image, mask=image.split()[3])  # Using the alpha channel as the mask
+        white_background.paste(
+            image, mask=image.split()[3]
+        )  # Using the alpha channel as the mask
         image = white_background
 
     # Resize the image to a smaller dimension of label_width pixels while maintaining aspect ratio
     width, height = image.size
-    
+
     if min(width, height) != label_width:
         if width < height:
             new_width = label_width
@@ -224,23 +237,26 @@ def preper_image(image, label_width=label_width):
         image = image.resize((new_width, new_height))
 
     # Ensure the image is in grayscale mode
-    if image.mode != 'L':
-        grayscale_image = image.convert('L')
+    if image.mode != "L":
+        grayscale_image = image.convert("L")
     else:
         grayscale_image = image
 
     # Apply Floyd-Steinberg dithering
-    dithered_image = grayscale_image.convert('1', dither=Image.FLOYDSTEINBERG)
-    
+    dithered_image = grayscale_image.convert("1", dither=Image.FLOYDSTEINBERG)
+
     return grayscale_image, dithered_image
+
 
 def print_image(image, rotate=0, dither=False):
     # Ensure the temporary directory exists
     temp_dir = tempfile.gettempdir()
     os.makedirs(temp_dir, exist_ok=True)
-    
+
     # Save the image to a temporary file
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False, dir=temp_dir) as temp_file:
+    with tempfile.NamedTemporaryFile(
+        suffix=".png", delete=False, dir=temp_dir
+    ) as temp_file:
         temp_file_path = temp_file.name
         image.save(temp_file_path, "PNG")
         print(f"Image saved to: {temp_file_path}")  # Print the full path
@@ -248,7 +264,9 @@ def print_image(image, rotate=0, dither=False):
     # Use find_and_parse_printer to get printer information
     printer_info = find_and_parse_printer()
     if not printer_info:
-        st.error("No Brother QL printer found. Please check the connection and try again.")
+        st.error(
+            "No Brother QL printer found. Please check the connection and try again."
+        )
         return
 
     # Construct the print command for logging
@@ -256,7 +274,7 @@ def print_image(image, rotate=0, dither=False):
     print(command)  # Log the command to standard output
 
     # Prepare the image for printing
-    qlr = BrotherQLRaster(printer_info['model'])
+    qlr = BrotherQLRaster(printer_info["model"])
     instructions = convert(
         qlr=qlr,
         images=[temp_file_path],
@@ -268,15 +286,21 @@ def print_image(image, rotate=0, dither=False):
         red=False,
         dpi_600=False,
         hq=True,
-        cut=True
+        cut=True,
     )
 
     # Print the label using the prepared instructions
     for _ in range(copy):
         try:
-            success = send(instructions=instructions, printer_identifier=printer_info['identifier'], backend_identifier='pyusb')
+            success = send(
+                instructions=instructions,
+                printer_identifier=printer_info["identifier"],
+                backend_identifier="pyusb",
+            )
             if not success:
-                st.error("Failed to print the label. Please check the printer and try again.")
+                st.error(
+                    "Failed to print the label. Please check the printer and try again."
+                )
         except usb.core.USBError as e:
             if "timeout error" in str(e):
                 print("USB timeout error occurred, but it's okay.")
@@ -285,32 +309,41 @@ def print_image(image, rotate=0, dither=False):
             st.error(f"USBError encountered: {e}")
             return False
 
+
 def find_url(string):
-    url_pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+    url_pattern = re.compile(
+        r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+    )
     urls = re.findall(url_pattern, string)
     return urls
 
+
 def img_concat_v(im1, im2, image_width=label_width):
-    dst = Image.new('RGB', (im1.width, im1.height + image_width))
+    dst = Image.new("RGB", (im1.width, im1.height + image_width))
     dst.paste(im1, (0, 0))
     im2 = im2.resize((image_width, image_width))
 
     dst.paste(im2, (0, im1.height))
     return dst
 
+
 # Streamlit app
-st.title('STICKER FACTORY @ [TAMI](https://telavivmakers.org)')
+st.title("STICKER FACTORY @ [TAMI](https://telavivmakers.org)")
 
 st.subheader(":printer: hard copies of images and text")
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Sticker", "Label", "Text2image", "Webcam", "Cat", "history", "FAQ"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+    ["Sticker", "Label", "Text2image", "Webcam", "Cat", "history", "FAQ"]
+)
 
 # sticker
 with tab1:
     st.subheader("Sticker")
 
     # Allow the user to upload an image
-    uploaded_image = st.file_uploader("Choose an image file to print", type=['png', 'jpg', 'gif', 'webp'])
+    uploaded_image = st.file_uploader(
+        "Choose an image file to print", type=["png", "jpg", "gif", "webp"]
+    )
 
     # Initialize a variable for the image to be processed
     image_to_process = None
@@ -319,45 +352,53 @@ with tab1:
     # Check if an image has been uploaded
     if uploaded_image is not None:
         # Convert the uploaded file to a PIL Image
-        image_to_process = Image.open(uploaded_image).convert('RGB')
+        image_to_process = Image.open(uploaded_image).convert("RGB")
         filename = os.path.splitext(uploaded_image.name)[0]
-    
+
         # Get the original filename without extension
-        original_filename_without_extension = os.path.splitext(uploaded_image.name)[0] if uploaded_image else "selected_image"
-    
+        original_filename_without_extension = (
+            os.path.splitext(uploaded_image.name)[0]
+            if uploaded_image
+            else "selected_image"
+        )
+
         # grayimage = add_white_background_and_convert_to_grayscale(image_to_process)
         grayscale_image, dithered_image = preper_image(image_to_process)
-    
+
         # Paths to save the original and dithered images in the 'temp' directory with postfix
-        original_image_path = os.path.join('temp', original_filename_without_extension + '_original.png')
+        original_image_path = os.path.join(
+            "temp", original_filename_without_extension + "_original.png"
+        )
 
         # Create checkboxes for rotation and dithering (dither default to True) inline
         col1, col2 = st.columns(2)
         with col1:
-            dither_checkbox = st.checkbox('Dither - _use for high detail, true by default_', value=True)
+            dither_checkbox = st.checkbox(
+                "Dither - _use for high detail, true by default_", value=True
+            )
         with col2:
-            rotate_checkbox = st.checkbox('Rotate - _90 degrees_')
-    
+            rotate_checkbox = st.checkbox("Rotate - _90 degrees_")
+
         # Determine the button text based on checkbox states
-        button_text = 'Print '
+        button_text = "Print "
         if rotate_checkbox:
-            button_text += 'Rotated '
+            button_text += "Rotated "
         if dither_checkbox:
-            button_text += 'Dithered '
-        button_text += 'Image'
-    
+            button_text += "Dithered "
+        button_text += "Image"
+
         # Create a single button with dynamic text
         if st.button(button_text):
             rotate_value = 90 if rotate_checkbox else 0
             dither_value = dither_checkbox
             print_image(image_to_process, rotate=rotate_value, dither=dither_value)
-    
+
         # Display image based on checkbox status
         if dither_checkbox:
             st.image(dithered_image, caption="Resized and Dithered Image")
         else:
             st.image(image_to_process, caption="Original Image")
-    
+
         # Save original image
         image_to_process.save(original_image_path, "PNG")
 
@@ -369,39 +410,53 @@ with tab2:
 
     # Function to calculate the actual image height based on the bounding boxes of each line
     def calculate_actual_image_height_with_empty_lines(text, font, line_spacing=10):
-        draw = ImageDraw.Draw(Image.new("RGB", (1, 1), color="white"))  # Dummy image for calculation
+        draw = ImageDraw.Draw(
+            Image.new("RGB", (1, 1), color="white")
+        )  # Dummy image for calculation
         total_height = 0
-        
+
         # Get font metrics for consistent spacing
         ascent, descent = font.getmetrics()
         font_height = ascent + descent
-        
-        for line in text.split('\n'):
+
+        for line in text.split("\n"):
             if line.strip():  # Non-empty lines
                 # Use textbbox for more accurate measurements
                 bbox = draw.textbbox((0, 0), line, font=font)
-                text_height = max(bbox[3] - bbox[1], font_height)  # Use the larger of bbox height or font height
+                text_height = max(
+                    bbox[3] - bbox[1], font_height
+                )  # Use the larger of bbox height or font height
             else:  # Empty lines
                 text_height = font_height
-                
+
             total_height += text_height + line_spacing
-        
+
         # Add padding at top and bottom
         padding = 20
         return total_height + (padding * 2)  # Add padding to total height
 
     # Function to calculate the maximum font size based on the width of the longest line
-    def calculate_max_font_size(width, text, font_path, start_size=10, end_size=200, step=1):
-        draw = ImageDraw.Draw(Image.new("RGB", (1, 1), color="white"))  # Dummy image for calculation
+    def calculate_max_font_size(
+        width, text, font_path, start_size=10, end_size=200, step=1
+    ):
+        draw = ImageDraw.Draw(
+            Image.new("RGB", (1, 1), color="white")
+        )  # Dummy image for calculation
         max_font_size = start_size
 
         for size in range(start_size, end_size, step):
             font = ImageFont.truetype(font_path, size)
             adjusted_lines = []
-            for line in text.split('\n'):
+            for line in text.split("\n"):
                 adjusted_lines.append(line)
 
-            max_text_width = max([draw.textbbox((0, 0), line, font=font)[2] for line in adjusted_lines if line.strip()])
+            max_text_width = max(
+                [
+                    draw.textbbox((0, 0), line, font=font)[2]
+                    for line in adjusted_lines
+                    if line.strip()
+                ]
+            )
 
             if max_text_width <= width:
                 max_font_size = size
@@ -437,15 +492,19 @@ with tab2:
         if fontstuff:
             # Font Selection with session state
             with col1:
-                font = st.selectbox("Choose your font", 
-                                  available_fonts, 
-                                  index=available_fonts.index(st.session_state.selected_font))
+                font = st.selectbox(
+                    "Choose your font",
+                    available_fonts,
+                    index=available_fonts.index(st.session_state.selected_font),
+                )
                 st.session_state.selected_font = font
 
             # Alignment
             with col2:
                 alignment_options = ["left", "center", "right"]
-                alignment = st.selectbox("Choose text alignment", alignment_options, index=1)
+                alignment = st.selectbox(
+                    "Choose text alignment", alignment_options, index=1
+                )
             font_size = st.slider("Font Size", 5, max_size + 5, max_size)
             font_size
         # Font Size
@@ -453,7 +512,9 @@ with tab2:
         line_spacing = 20  # Adjust this value to set the desired line spacing
 
         # Calculate the new image height based on the bounding boxes
-        new_image_height = calculate_actual_image_height_with_empty_lines(text, fnt, line_spacing)
+        new_image_height = calculate_actual_image_height_with_empty_lines(
+            text, fnt, line_spacing
+        )
 
         # Create Image with padding
         padding = 20  # Consistent with the padding in calculate_actual_image_height
@@ -464,7 +525,7 @@ with tab2:
         y = padding  # Start from padding instead of 5
 
         # Draw Text
-        for line in text.split('\n'):
+        for line in text.split("\n"):
             text_width = 0
             ascent, descent = fnt.getmetrics()
             font_height = ascent + descent
@@ -494,11 +555,11 @@ with tab2:
             st.success(f"Label saved as {filename}")
 
     # QR code
-    qr = qrcode.QRCode(
-        border=0
-    )
+    qr = qrcode.QRCode(border=0)
 
-    qrurl = st.text_input("add a QRcode to your sticker",)
+    qrurl = st.text_input(
+        "add a QRcode to your sticker",
+    )
     if qrurl:
         # we have text generate qr
         qr.add_data(qrurl)
@@ -516,22 +577,24 @@ with tab2:
             # add qr below the label
             imgqr = img_concat_v(img, imgqr)
             st.image(imgqr, use_column_width=True)
-            if st.button('Print sticker+qr'):
+            if st.button("Print sticker+qr"):
                 print_image(imgqr)
         elif imgqr and not (img):
             # st.image(imgqr, use_column_width=True)
-            if st.button('Print sticker'):
+            if st.button("Print sticker"):
                 print_image(imgqr)
 
     if text and not (qrurl):
         st.image(img, use_column_width=True)
-        if st.button('Print sticker'):
+        if st.button("Print sticker"):
             print_image(img)  # Needs definition
-            st.success('sticker sent to printer')
-    st.markdown('''
+            st.success("sticker sent to printer")
+    st.markdown(
+        """
                 * label will automaticly resize to fit the longest line, so use linebreaks.
                 * on pc `ctrl+enter` will submit, on mobile click outside the `text_area` to process.
-                ''')
+                """
+    )
 
 # text2img
 # Streamlit reruns the script every time the user interacts with the page.
@@ -543,10 +606,14 @@ if "prompt" not in st.session_state:
 if "generated_image" not in st.session_state:
     st.session_state.generated_image = None
 
+
 def submit():
     st.session_state.prompt = st.session_state.widget
     st.session_state.widget = ""
-    st.session_state.generated_image = None  # Reset the generated image when a new prompt is entered
+    st.session_state.generated_image = (
+        None  # Reset the generated image when a new prompt is entered
+    )
+
 
 with tab3:
     st.subheader(":printer: image from text")
@@ -558,7 +625,9 @@ with tab3:
     if prompt and st.session_state.generated_image is None:
         st.write("Generating image from prompt: " + prompt)
         generated_image = generate_image(prompt, 30)
-        st.session_state.generated_image = generated_image  # Store the generated image in session state
+        st.session_state.generated_image = (
+            generated_image  # Store the generated image in session state
+        )
 
     if st.session_state.generated_image:
         generated_image = st.session_state.generated_image
@@ -572,13 +641,13 @@ with tab3:
 
         col3, col4 = st.columns(2)
         with col3:
-            if st.button('Print Original Image'):
+            if st.button("Print Original Image"):
                 print_image(grayscale_image)
-                st.success('Original image sent to printer!')
+                st.success("Original image sent to printer!")
         with col4:
-            if st.button('Print Dithered Image'):
+            if st.button("Print Dithered Image"):
                 print_image(grayscale_image, dither=True)
-                st.success('Dithered image sent to printer!')
+                st.success("Dithered image sent to printer!")
 
     # Update last prompt
     st.session_state.last_prompt = prompt
@@ -586,11 +655,11 @@ with tab3:
 # webcam
 with tab4:
     st.subheader(":printer: a snapshot")
-    on = st.toggle('ask user for camera permission')
+    on = st.toggle("ask user for camera permission")
     if on:
         picture = st.camera_input("Take a picture")
         if picture is not None:
-            picture = Image.open(picture).convert('RGB')
+            picture = Image.open(picture).convert("RGB")
             grayscale_image, dithered_image = preper_image(picture)
 
             st.image(dithered_image, caption="Resized and Dithered Image")
@@ -598,14 +667,14 @@ with tab4:
             # print options
             colc, cold = st.columns(2)
             with colc:
-                if st.button('Print rotated Image'):
+                if st.button("Print rotated Image"):
                     print_image(grayscale_image, rotate=90, dither=True)
                     st.balloons()
-                    st.success('rotated image sent to printer!')
+                    st.success("rotated image sent to printer!")
             with cold:
-                if st.button('Print Image'):
+                if st.button("Print Image"):
                     print_image(grayscale_image, dither=True)
-                    st.success('image sent to printer!')
+                    st.success("image sent to printer!")
 
 # cat
 with tab5:
@@ -622,7 +691,7 @@ with tab5:
         data = response.json()
 
         # Extract image URL from JSON
-        image_url = data[0]['url']
+        image_url = data[0]["url"]
 
         # Fetch the image
         image_response = requests.get(image_url)
@@ -648,21 +717,23 @@ with tab6:
                     image_path = saved_images[idx]
                     image = Image.open(image_path)
                     st.image(image, use_column_width=True)
-                    
+
                     filename = os.path.basename(image_path)
-                    modified_time = datetime.fromtimestamp(os.path.getmtime(image_path)).strftime('%Y-%m-%d %H:%M')
+                    modified_time = datetime.fromtimestamp(
+                        os.path.getmtime(image_path)
+                    ).strftime("%Y-%m-%d %H:%M")
                     st.caption(f"{filename}\n{modified_time}")
-                    
+
                     if st.button(f"Print", key=f"print_{idx}"):
                         print_image(image, dither=True)
-                        st.success('Sent to printer!')
+                        st.success("Sent to printer!")
 
 
 # faq
 with tab7:
     st.subheader("FAQ:")
     st.markdown(
-        '''
+        """
         *dithering* is suggested (sometimes inforced) if source is not lineart as grayscale and color look bad at thermal printer
 
         all uploaded images and generated labels are saved
@@ -671,7 +742,6 @@ with tab7:
         app [code](https://github.com/5shekel/printit)
 
         PRINT ALOT is the best!
-        '''
+        """
     )
-    st.image(Image.open('assets/station_sm.jpg'), caption="TAMI printshop")
-
+    st.image(Image.open("assets/station_sm.jpg"), caption="TAMI printshop")
