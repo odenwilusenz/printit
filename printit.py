@@ -18,22 +18,6 @@ from brother_ql.backends.helpers import send
 from brother_ql import labels  # Import the labels module
 import usb.core
 
-label_type = st.secrets["label_type"]  # Get label type from secrets
-txt2img_url = st.secrets["txt2img_url"]  # get txt2img url from secrets
-
-
-def get_label_width(label_type):
-    label_definitions = (
-        labels.ALL_LABELS
-    )  # Assuming ALL_LABELS is the tuple containing label definitions
-    for label in label_definitions:
-        if label.identifier == label_type:
-            return label.dots_printable[0]  # Return only the width
-    raise ValueError(f"Label type {label_type} not found in label definitions")
-
-
-label_width = get_label_width(label_type)  # Use the width as label_width
-
 
 def find_and_parse_printer():
     model_manager = ModelsManager()
@@ -69,6 +53,36 @@ def find_and_parse_printer():
             }
 
     return None
+
+# Get label type from secrets with fallback to default based on printer model
+def get_default_label_type(model):
+    if model.upper().startswith('QL-1'):
+        return "102"
+    return "62"
+
+# Try to get label_type from secrets, otherwise use default
+label_type = st.secrets.get("label_type", None)
+if not label_type:
+    printer_info = find_and_parse_printer()
+    if printer_info:
+        label_type = get_default_label_type(printer_info["model"])
+    else:
+        label_type = "62"  # Fallback default if no printer found
+
+txt2img_url = st.secrets["txt2img_url"]  # get txt2img url from secrets
+
+
+def get_label_width(label_type):
+    label_definitions = (
+        labels.ALL_LABELS
+    )  # Assuming ALL_LABELS is the tuple containing label definitions
+    for label in label_definitions:
+        if label.identifier == label_type:
+            return label.dots_printable[0]  # Return only the width
+    raise ValueError(f"Label type {label_type} not found in label definitions")
+
+
+label_width = get_label_width(label_type)  # Use the width as label_width
 
 
 # Check if the 'copy' parameter exists
