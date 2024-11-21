@@ -107,15 +107,33 @@ def list_saved_images():
 
 # Function to find .ttf fonts
 def find_fonts():
-    font_dirs = ["fonts", "/usr/share/fonts/"]
+    font_dirs = [
+        "fonts",  # Local fonts directory
+        "/usr/share/fonts/",  # Linux system fonts
+        "C:/Windows/Fonts/",  # Windows system fonts
+        os.path.expanduser("~/.fonts/"),  # Linux user fonts
+        os.path.expanduser("~/Library/Fonts/"),  # macOS user fonts
+        "/Library/Fonts/",  # macOS system fonts
+    ]
+    
     fonts = []
     for dir in font_dirs:
         if os.path.exists(dir):
+            # Walk through directory and subdirectories
             for root, _, files in os.walk(dir):
                 for file in files:
-                    if file.endswith(".ttf"):
-                        fonts.append(os.path.join(root, file))
-    return fonts
+                    if file.lower().endswith(('.ttf', '.otf')):  # Added .otf support
+                        try:
+                            font_path = os.path.join(root, file)
+                            # Verify it's a valid font by attempting to load it
+                            ImageFont.truetype(font_path, 12)
+                            fonts.append(font_path)
+                        except Exception:
+                            # Skip invalid fonts
+                            continue
+    
+    # Remove duplicates while preserving order
+    return list(dict.fromkeys(fonts))
 
 def safe_filename(text):
     # Sanitize the text to remove illegal characters and replace spaces with underscores
@@ -400,12 +418,19 @@ with tab2:
         max_size = calculate_max_font_size(label_width, text, font)
         font_size = max_size
 
+        # Initialize font selection in session state if not already present
+        if "selected_font" not in st.session_state:
+            st.session_state.selected_font = available_fonts[0]
+
         fontstuff = st.checkbox("font settings", value=False)
         col1, col2 = st.columns(2)
         if fontstuff:
-            # Font Selection
+            # Font Selection with session state
             with col1:
-                font = st.selectbox("Choose your font", available_fonts)
+                font = st.selectbox("Choose your font", 
+                                  available_fonts, 
+                                  index=available_fonts.index(st.session_state.selected_font))
+                st.session_state.selected_font = font
 
             # Alignment
             with col2:
