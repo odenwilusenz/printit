@@ -336,6 +336,20 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     ["Sticker", "Label", "Text2image", "Webcam", "Cat", "history", "FAQ"]
 )
 
+# Initialize the session state for the prompt and image
+if "prompt" not in st.session_state:
+    st.session_state.prompt = ""
+if "generated_image" not in st.session_state:
+    st.session_state.generated_image = None
+
+
+def submit():
+    st.session_state.prompt = st.session_state.widget
+    st.session_state.widget = ""
+    st.session_state.generated_image = (
+        None  # Reset the generated image when a new prompt is entered
+    )
+
 # sticker
 with tab1:
     st.subheader("Sticker")
@@ -597,24 +611,6 @@ with tab2:
     )
 
 # text2img
-# Streamlit reruns the script every time the user interacts with the page.
-# To execute code only when a new prompt is entered, you need to keep track of the last prompt value
-
-# Initialize the session state for the prompt and image
-if "prompt" not in st.session_state:
-    st.session_state.prompt = ""
-if "generated_image" not in st.session_state:
-    st.session_state.generated_image = None
-
-
-def submit():
-    st.session_state.prompt = st.session_state.widget
-    st.session_state.widget = ""
-    st.session_state.generated_image = (
-        None  # Reset the generated image when a new prompt is entered
-    )
-
-
 with tab3:
     st.subheader(":printer: image from text")
     st.write("using tami stable diffusion bot")
@@ -727,7 +723,6 @@ with tab6:
                     if st.button(f"Print", key=f"print_{idx}"):
                         print_image(image, dither=True)
                         st.success("Sent to printer!")
-
 
 # faq
 with tab7:
