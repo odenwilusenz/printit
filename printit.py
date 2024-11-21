@@ -17,9 +17,8 @@ from brother_ql.backends.helpers import send
 from brother_ql import labels  # Import the labels module
 import usb.core
 
-label_type = "62red" # good for ql-[500-800] series (anyh 62mm wide)
-label_type = "102" # good for ql-1100 (any 100mm wide)
-
+label_type = st.secrets["label_type"]  # Get label type from secrets
+txt2img_url = st.secrets["txt2img_url"] # get txt2img url from secrets
 
 def get_label_width(label_type):
     label_definitions = labels.ALL_LABELS  # Assuming ALL_LABELS is the tuple containing label definitions
@@ -117,11 +116,10 @@ def generate_image(prompt, steps):
         "steps": steps,
         "width": label_width
     }
-    url = "http://pop-os:7860"
-    url = "https://umcnrfui918x.zrok.yair.cc"
-
+ 
     try:
-        response = requests.post(url=f'{url}/sdapi/v1/txt2img', json=payload)
+        # print(f'{txt2img_url}/sdapi/v1/txt2img') #debug
+        response = requests.post(url=f'{txt2img_url}/sdapi/v1/txt2img', json=payload)
 
         # Check if the request was successful
         response.raise_for_status()
@@ -139,7 +137,7 @@ def generate_image(prompt, steps):
             png_payload = {
                 "image": "data:image/png;base64," + first_image
             }
-            response2 = requests.post(url=f'{url}/sdapi/v1/png-info', json=png_payload)
+            response2 = requests.post(url=f'{txt2img_url}/sdapi/v1/png-info', json=png_payload)
             response2.raise_for_status()
 
             # save image
