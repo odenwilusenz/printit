@@ -328,7 +328,7 @@ def img_concat_v(im1, im2, image_width=label_width):
 
 
 # Streamlit app
-st.title("STICKER FACTORY @ [TAMI](https://telavivmakers.org)")
+st.title("STICKER FACTORY")
 
 st.subheader(":printer: hard copies of images and text")
 
