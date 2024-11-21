@@ -173,10 +173,16 @@ os.makedirs(label_dir, exist_ok=True)
 
 def generate_image(prompt, steps):
     payload = {"prompt": prompt, "steps": steps, "width": label_width}
+    
+    # Get txt2img_url from secrets with default fallback
+    txt2img_url = st.secrets.get("txt2img_url", "http://localhost:7860")
+    
+    # Show warning if using default URL
+    if txt2img_url == "http://localhost:7860":
+        st.warning("Using default Stable Diffusion URL (http://localhost:7860). Configure txt2img_url in .streamlit/secrets.toml for custom endpoint.")
 
     try:
-        # print(f'{txt2img_url}/sdapi/v1/txt2img') #debug
-        response = requests.post(url=f"{txt2img_url}/sdapi/v1/txt2img", json=payload)
+        response = requests.post(url=f'{txt2img_url}/sdapi/v1/txt2img', json=payload)
 
         # Check if the request was successful
         response.raise_for_status()
