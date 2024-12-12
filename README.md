@@ -78,3 +78,11 @@ zrok share reserved kjvrml0bxatq
 ```
 you can also run a service for this. 
 
+
+### windows
+to get the brother_ql lib to detect the printer, you need to install a usb filter 
+ - grab release from [libusb-win32](https://github.com/mcuee/libusb-win32/)
+ - run `install-filter-win.exe` as admin
+ - choose the right usb dev for your printer
+
+
