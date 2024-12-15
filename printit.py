@@ -17,6 +17,7 @@ from brother_ql.conversion import convert
 from brother_ql.backends.helpers import send
 from brother_ql import labels  # Import the labels module
 import usb.core
+import subprocess
 
 
 def find_and_parse_printer():
@@ -54,31 +55,80 @@ def find_and_parse_printer():
 
     return None
 
-# Get label type from secrets with fallback to default based on printer model
+def get_printer_label_info():
+    printer_info = find_and_parse_printer()
+    if not printer_info:
+        return None, "No printer found"
+    
+    try:
+        # Use brother_ql command line tool to get status
+        cmd = f"brother_ql -b pyusb --model {printer_info['model']} -p {printer_info['identifier']} status"
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            return None, "Could not get printer status"
+        
+        status_output = result.stdout
+        
+        # Parse the status output
+        media_type = None
+        media_width = None
+        media_length = None
+        
+        for line in status_output.split('\n'):
+            if 'Media type:' in line:
+                media_type = line.split(':')[1].strip()
+            elif 'Media size:' in line:
+                size_parts = line.split(':')[1].strip().split('x')
+                if len(size_parts) >= 1:
+                    try:
+                        media_width = int(size_parts[0].strip())
+                        if len(size_parts) > 1:
+                            media_length = int(size_parts[1].strip())
+                    except ValueError:
+                        pass
+        
+        # Find matching label type
+        if media_width:
+            for label in labels.ALL_LABELS:
+                if label.dots_printable[0] == media_width:
+                    return label.identifier, f"Detected {label.identifier} ({media_width}x{media_length if media_length else 0} dots)"
+                
+        return None, f"Unknown label type: {media_width}x{media_length if media_length else 0} dots"
+        
+    except Exception as e:
+        return None, f"Error getting printer status: {str(e)}"
+
+# Get label type from printer with fallback to secrets and defaults
 def get_default_label_type(model):
     if model.upper().startswith('QL-1'):
         return "102"
     return "62"
 
-# Try to get label_type from secrets, otherwise use default
-label_type = st.secrets.get("label_type", None)
-if not label_type:
-    printer_info = find_and_parse_printer()
-    if printer_info:
-        label_type = get_default_label_type(printer_info["model"])
-    else:
-        label_type = "62"  # Fallback default if no printer found
+# Try to get label_type from printer first
+detected_label, status_message = get_printer_label_info()
+if detected_label:
+    label_type = detected_label
+else:
+    # Fallback to secrets or default
+    label_type = st.secrets.get("label_type", None)
+    if not label_type:
+        printer_info = find_and_parse_printer()
+        if printer_info:
+            label_type = get_default_label_type(printer_info["model"])
+        else:
+            label_type = "62"  # Fallback default if no printer found
 
 txt2img_url = st.secrets["txt2img_url"]  # get txt2img url from secrets
 
 
 def get_label_width(label_type):
-    label_definitions = (
-        labels.ALL_LABELS
-    )  # Assuming ALL_LABELS is the tuple containing label definitions
+    label_definitions = labels.ALL_LABELS
     for label in label_definitions:
         if label.identifier == label_type:
-            return label.dots_printable[0]  # Return only the width
+            width = label.dots_printable[0]
+            print(f"Label type {label_type} width: {width} dots")  # Debug print
+            return width
     raise ValueError(f"Label type {label_type} not found in label definitions")
 
 
@@ -235,28 +285,23 @@ def generate_image(prompt, steps):
 
 
 def preper_image(image, label_width=label_width):
+    # Debug print original image size
+    # print(f"Original image size: {image.size}")
+    
     if image.mode == "RGBA":
-        # Create a white background of the same size as the original image
         white_background = Image.new("RGBA", image.size, "white")
-        # Paste the original image onto the white background
-        white_background.paste(
-            image, mask=image.split()[3]
-        )  # Using the alpha channel as the mask
+        white_background.paste(image, mask=image.split()[3])
         image = white_background
 
-    # Resize the image to a smaller dimension of label_width pixels while maintaining aspect ratio
+    # Only resize if the image width doesn't match label width
     width, height = image.size
+    if width != label_width:
+        # Calculate new height maintaining aspect ratio
+        new_height = int((label_width / width) * height)
+        image = image.resize((label_width, new_height))
+        print(f"Resizing image from ({width}, {height}) >> {image.size}")
 
-    if min(width, height) != label_width:
-        if width < height:
-            new_width = label_width
-            new_height = int((label_width / width) * height)
-        else:
-            new_height = label_width
-            new_width = int((label_width / height) * width)
-        image = image.resize((new_width, new_height))
-
-    # Ensure the image is in grayscale mode
+    # Convert to grayscale if needed
     if image.mode != "L":
         grayscale_image = image.convert("L")
     else:
@@ -291,7 +336,7 @@ def print_image(image, rotate=0, dither=False):
 
     # Construct the print command for logging
     command = f"brother_ql -b {printer_info['backend']} --model {printer_info['model']} -p {printer_info['identifier']} print -l {label_type} \"{temp_file_path}\""
-    print(command)  # Log the command to standard output
+    print(f"Equivalent CLI command: \n{command}")  # Log the command to standard output
 
     # Prepare the image for printing
     qlr = BrotherQLRaster(printer_info["model"])
@@ -300,34 +345,45 @@ def print_image(image, rotate=0, dither=False):
         images=[temp_file_path],
         label=label_type,
         rotate=rotate,
-        threshold=0,
+        threshold=70,  # Default CLI threshold
         dither=dither,
-        compress=False,
+        compress=True,  # CLI uses compression by default
         red=False,
         dpi_600=False,
-        hq=True,
+        hq=False,  # CLI doesn't use HQ by default
         cut=True,
     )
 
-    # Print the label using the prepared instructions
-    for _ in range(copy):
-        try:
-            success = send(
-                instructions=instructions,
-                printer_identifier=printer_info["identifier"],
-                backend_identifier="pyusb",
-            )
-            if not success:
-                st.error(
-                    "Failed to print the label. Please check the printer and try again."
-                )
-        except usb.core.USBError as e:
-            if "timeout error" in str(e):
-                print("USB timeout error occurred, but it's okay.")
-                return True
-            print(f"USBError encountered: {e}")
-            st.error(f"USBError encountered: {e}")
+    # Debug logging
+    print(f"""
+    Print parameters:
+    - Label type: {label_type}
+    - Rotate: {rotate}
+    - Dither: {dither}
+    - Model: {printer_info['model']}
+    - Backend: {printer_info['backend']}
+    - Identifier: {printer_info['identifier']}
+    """)
+
+    # Try to print using Python API
+    try:
+        success = send(
+            instructions=instructions,
+            printer_identifier=printer_info["identifier"],
+            backend_identifier="pyusb",
+        )
+        
+        if not success:
+            st.error("Failed to print using Python API")
             return False
+            
+    except usb.core.USBError as e:
+        if "timeout error" in str(e):
+            print("USB timeout error occurred, but it's okay.")
+            return True
+        print(f"USBError encountered: {e}")
+        st.error(f"USBError encountered: {e}")
+        return False
 
 
 def find_url(string):
@@ -433,6 +489,9 @@ with tab1:
         else:
             st.image(image_to_process, caption="Original Image")
 
+        # Create 'temp' directory if it doesn't exist
+        os.makedirs("temp", exist_ok=True)
+        
         # Save original image
         image_to_process.save(original_image_path, "PNG")
 
