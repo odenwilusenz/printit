@@ -51,9 +51,8 @@ def find_and_parse_printer():
                 "vendor_id": vendor_id,
                 "product_id": product_id,
                 "serial_number": serial_number,
-            }
-
-    return None
+            }       
+        return None
 
 def get_printer_label_info():
     printer_info = find_and_parse_printer()
@@ -69,57 +68,71 @@ def get_printer_label_info():
             return None, "Could not get printer status"
         
         status_output = result.stdout
+        print(f"Printer status output: {status_output}")  # Debug print
         
         # Parse the status output
-        media_type = None
-        media_width = None
-        media_length = None
+        media_width_mm = None
         
         for line in status_output.split('\n'):
-            if 'Media type:' in line:
-                media_type = line.split(':')[1].strip()
-            elif 'Media size:' in line:
-                size_parts = line.split(':')[1].strip().split('x')
-                if len(size_parts) >= 1:
-                    try:
-                        media_width = int(size_parts[0].strip())
-                        if len(size_parts) > 1:
-                            media_length = int(size_parts[1].strip())
-                    except ValueError:
-                        pass
+            if 'Media size:' in line:
+                try:
+                    # Extract just the number before 'x'
+                    width_str = line.split(':')[1].split('x')[0].strip()
+                    media_width_mm = int(width_str)
+                    print(f"Detected media width: {media_width_mm}mm")  # Debug print
+                except ValueError:
+                    continue
         
-        # Find matching label type
-        if media_width:
-            for label in labels.ALL_LABELS:
-                if label.dots_printable[0] == media_width:
-                    return label.identifier, f"Detected {label.identifier} ({media_width}x{media_length if media_length else 0} dots)"
-                
-        return None, f"Unknown label type: {media_width}x{media_length if media_length else 0} dots"
+        # Map physical width in mm to brother_ql label types
+        label_sizes = {
+            12: "12",     # 106 dots printable
+            29: "29",     # 306 dots printable
+            38: "38",     # 413 dots printable
+            50: "50",     # 554 dots printable
+            54: "54",     # 590 dots printable
+            62: "62",     # 696 dots printable
+            102: "102",   # 1164 dots printable
+            103: "103",   # 1200 dots printable
+            104: "104"    # 1200 dots printable
+        }
+        
+        if media_width_mm in label_sizes:
+            label_type = label_sizes[media_width_mm]
+            return label_type, f"Detected {label_type} ({media_width_mm}mm)"
+        
+        return None, f"Unknown label width: {media_width_mm}mm"
         
     except Exception as e:
         return None, f"Error getting printer status: {str(e)}"
 
-# Get label type from printer with fallback to secrets and defaults
-def get_default_label_type(model):
-    if model.upper().startswith('QL-1'):
-        return "102"
-    return "62"
+def get_label_type():
+    """
+    Determine label type in order of precedence:
+    1. From printer's current media (most accurate)
+    2. From secrets.toml configuration (fallback)
+    3. Default to "62" with warning
+    """
+    # Try to detect from printer's current media
+    detected_label, status_message = get_printer_label_info()
+    if detected_label:
+        return detected_label, status_message
 
-# Try to get label_type from printer first
-detected_label, status_message = get_printer_label_info()
-if detected_label:
-    label_type = detected_label
+    # Try to get from secrets.toml
+    if "label_type" in st.secrets:
+        return st.secrets["label_type"], "Using configured label_type from secrets"
+
+    # If neither works, return default with warning
+    st.warning("⚠️ No label type detected from printer and none configured in secrets.toml. Using default label type 62")
+    return "62", "Using default label type 62"
+
+# Get label type and status message
+label_type, label_status = get_label_type()
+
+if 'txt2img_url' not in st.secrets:
+    st.warning("⚠️ txt2img_url not found in secrets. Using default localhost:8670")
+    txt2img_url = "http://localhost:8670"
 else:
-    # Fallback to secrets or default
-    label_type = st.secrets.get("label_type", None)
-    if not label_type:
-        printer_info = find_and_parse_printer()
-        if printer_info:
-            label_type = get_default_label_type(printer_info["model"])
-        else:
-            label_type = "62"  # Fallback default if no printer found
-
-txt2img_url = st.secrets["txt2img_url"]  # get txt2img url from secrets
+    txt2img_url = st.secrets['txt2img_url']
 
 
 def get_label_width(label_type):
