@@ -273,6 +273,17 @@ def resize_image_to_width(image, target_width_mm, current_dpi=300):
     print(f"Target width was {target_width_mm}mm ({target_width_px}px)")
     return resized_image
 
+def add_border(image, border_width=1):
+    """Add a thin black border around the image"""
+    if image.mode == '1':  # Binary image
+        # For binary images, create a new binary image with border
+        bordered = Image.new('1', (image.width + 2*border_width, image.height + 2*border_width), 0)  # 0 is black
+        bordered.paste(image, (border_width, border_width))
+        return bordered
+    else:
+        # For other modes, use ImageOps
+        return ImageOps.expand(image, border=border_width, fill='black')
+
 def main():
     st.title("mask print ++")
 
@@ -303,6 +314,7 @@ def main():
 
             st.text("General options:")
             mirror_checkbox = st.checkbox("Mirror Mask", value=False)
+            border_checkbox = st.checkbox("Show border in preview", value=True, help="Adds a border in the preview to help visualize boundaries (not printed)")
             
             # Add target width in mm option
             target_width_mm = st.number_input("Target Width (mm)", min_value=0, value=0)
@@ -330,8 +342,13 @@ def main():
                 threshold = int(threshold_percent * 255 / 100)
                 display_image = apply_threshold(image, threshold)
 
+            # Create a copy for display with border if needed
+            preview_image = display_image.copy()
+            if border_checkbox:
+                preview_image = add_border(preview_image)
+
         with col2:
-            st.image(display_image, caption="Preview", use_column_width=True)
+            st.image(preview_image, caption="Preview", use_column_width=True)
 
         print_button_label = f"Print {print_choice} Image"
         if print_choice == "Original" and dither:
