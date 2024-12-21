@@ -1,7 +1,7 @@
-streamlit
-flask
-pillow
-slugify
-qrcode
+streamlit>=1.26.0
+Pillow>=10.0.0
 brother-ql-inventree @ git+https://github.com/matmair/brother_ql-inventree@master
+pyusb>=1.2.1
+qrcode>=7.4.2
+requests>=2.31.0
 
