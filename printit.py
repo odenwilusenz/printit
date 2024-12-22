@@ -436,7 +436,18 @@ def get_cat_breeds():
 
 
 # Streamlit app
-st.title("STICKER FACTORY")
+if not os.path.exists(".streamlit/secrets.toml"):
+    st.error("⚠️ No secrets.toml file found!")
+    st.info("""
+    Please set up your `.streamlit/secrets.toml` file:
+    1. Copy the example file: `cp .streamlit/secrets.toml.example .streamlit/secrets.toml`
+    2. Edit the file with your settings
+    
+    The app will try to auto-detect your printer's label type, but you can override it in secrets.toml if needed.
+    See the example file for all available options and their descriptions.
+    """)
+
+st.title(st.secrets.get("title", "STICKER FACTORY"))
 
 st.subheader(":printer: hard copies of images and text")
 
