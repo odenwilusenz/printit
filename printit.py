@@ -155,6 +155,9 @@ copy = int(st.query_params.get("copy", [1])[0])  # Default to 1 copy if not spec
 
 # Function to list the last 15 saved images, excluding those ending with "dithered"
 def list_saved_images():
+    # Get history limit from secrets with default fallback of 15
+    history_limit = st.secrets.get("history_limit", 15)
+    
     # Get all image files from both temp and labels folders
     temp_files = glob.glob(os.path.join("temp", "*.[pj][np][g]*"))
     label_files = glob.glob(os.path.join("labels", "*.[pj][np][g]*"))
@@ -186,7 +189,7 @@ def list_saved_images():
             unique_images[base_name] = image_path
 
     # Sort by modification time (newest first)
-    return sorted(unique_images.values(), key=os.path.getmtime, reverse=True)[:15]
+    return sorted(unique_images.values(), key=os.path.getmtime, reverse=True)[:history_limit]
 
 
 # Function to find .ttf fonts
