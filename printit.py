@@ -153,8 +153,8 @@ label_width = get_label_width(label_type)  # Use the width as label_width
 copy = int(st.query_params.get("copy", [1])[0])  # Default to 1 copy if not specified
 
 
-# Function to list the last 15 saved images, excluding those ending with "dithered"
-def list_saved_images():
+# Function to list saved images with optional duplicate filtering
+def list_saved_images(filter_duplicates=True):
     # Get history limit from secrets with default fallback of 15
     history_limit = st.secrets.get("history_limit", 15)
     
@@ -165,28 +165,35 @@ def list_saved_images():
     # Combine all image files
     image_files = temp_files + label_files
 
-    # Create a dictionary to store the latest version of each base filename
+    # Filter out test labels and get valid images
+    valid_images = [
+        f for f in image_files 
+        if "write_something" not in os.path.basename(f).lower()
+    ]
+
+    if not filter_duplicates:
+        # Simply return all files sorted by modification time
+        return sorted(valid_images, key=os.path.getmtime, reverse=True)[:history_limit]
+
+    # Create a dictionary to store the latest version of each unique image size
     unique_images = {}
 
-    for image_path in image_files:
-        filename = os.path.basename(image_path)
-
-        # Skip test labels containing "write_something"
-        if "write_something" in filename.lower():
+    for image_path in valid_images:
+        try:
+            # Get file size in bytes
+            file_size = os.path.getsize(image_path)
+            
+            # If this size already exists, compare modification times
+            if file_size in unique_images:
+                existing_time = os.path.getmtime(unique_images[file_size])
+                current_time = os.path.getmtime(image_path)
+                if current_time > existing_time:
+                    unique_images[file_size] = image_path
+            else:
+                unique_images[file_size] = image_path
+        except Exception as e:
+            print(f"Error processing {image_path}: {e}")
             continue
-
-        # Simplified base_name extraction - just remove the extension
-        base_name = os.path.splitext(filename)[0]
-
-        # If this base_name already exists, compare modification times
-        if base_name in unique_images:
-            existing_time = os.path.getmtime(unique_images[base_name])
-            current_time = os.path.getmtime(image_path)
-
-            if current_time > existing_time:
-                unique_images[base_name] = image_path
-        else:
-            unique_images[base_name] = image_path
 
     # Sort by modification time (newest first)
     return sorted(unique_images.values(), key=os.path.getmtime, reverse=True)[:history_limit]
@@ -904,19 +911,30 @@ with tab6:
         st.session_state.page_number = 0
     if 'search_query' not in st.session_state:
         st.session_state.search_query = ""
+    if 'filter_duplicates' not in st.session_state:
+        st.session_state.filter_duplicates = True
     
     # Get pagination settings from secrets with defaults
     items_per_page = st.secrets.get("items_per_page", 5)  # Default to 3x3 grid
     
-    # Search and refresh controls in two columns
-    col1, col2 = st.columns([3, 1])
+    # Search, filter, and refresh controls
+    col1, col2, col3 = st.columns([3, 2, 1])
     with col1:
         search_query = st.text_input("Search filenames", value=st.session_state.search_query)
     with col2:
+        filter_duplicates = st.checkbox("Filter duplicates", value=st.session_state.filter_duplicates)
+        st.session_state.filter_duplicates = filter_duplicates
+    with col3:
         if st.button("Refresh Gallery"):
-            st.session_state.saved_images_list = list_saved_images()
+            st.session_state.saved_images_list = list_saved_images(filter_duplicates)
             st.session_state.page_number = 0
             st.rerun()
+
+    # Update image list if filter setting changed
+    if filter_duplicates != st.session_state.filter_duplicates:
+        st.session_state.saved_images_list = list_saved_images(filter_duplicates)
+        st.session_state.page_number = 0
+        st.rerun()
 
     # Filter images based on search query
     filtered_images = [
