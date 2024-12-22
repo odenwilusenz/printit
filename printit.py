@@ -811,6 +811,9 @@ with tab6:
     if 'search_query' not in st.session_state:
         st.session_state.search_query = ""
     
+    # Get pagination settings from secrets with defaults
+    items_per_page = st.secrets.get("items_per_page", 5)  # Default to 3x3 grid
+    
     # Search and refresh controls in two columns
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -828,7 +831,6 @@ with tab6:
     ]
 
     # Pagination
-    items_per_page = 9  # 3x3 grid
     total_pages = max((len(filtered_images) - 1) // items_per_page + 1, 1)
     
     # Pagination controls
