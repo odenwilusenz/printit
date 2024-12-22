@@ -798,27 +798,40 @@ with tab4:
 with tab5:
     st.subheader(":printer: a cat")
     st.caption("from the fine folks at https://thecatapi.com/")
-    if st.button("Fetch cat"):
-        # Fetch API key from Streamlit secrets
-        api_key = st.secrets["cat_api_key"]
-        caturl = "https://api.thecatapi.com/v1/images/search"
+    
+    # Check if Cat API key exists and is valid
+    cat_api_key = st.secrets.get("cat_api_key", "")
+    
+    if not cat_api_key or cat_api_key == "ask me":
+        st.warning("⚠️ Cat API key is not configured")
+        st.info("""
+        To enable the Cat API feature:
+        1. Get a free API key from [TheCatAPI](https://thecatapi.com/)
+        2. Add your key to `.streamlit/secrets.toml`:
+        ```toml
+        cat_api_key = "your_api_key_here"
+        ```
+        """)
+    else:
+        if st.button("Fetch cat"):
+            caturl = "https://api.thecatapi.com/v1/images/search"
 
-        # Fetch JSON data
-        api_url = f"{caturl}?limit=1&type=static&api_key={api_key}"
-        response = requests.get(api_url)
-        data = response.json()
+            # Fetch JSON data
+            api_url = f"{caturl}?limit=1&type=static&api_key={cat_api_key}"
+            response = requests.get(api_url)
+            data = response.json()
 
-        # Extract image URL from JSON
-        image_url = data[0]["url"]
+            # Extract image URL from JSON
+            image_url = data[0]["url"]
 
-        # Fetch the image
-        image_response = requests.get(image_url)
-        img = Image.open(io.BytesIO(image_response.content))
-        # Display the image
-        grayscale_image, dithered_image = preper_image(img)
-        st.image(img, caption="Fetched Cat Image")
-        # Your print logic here
-        print_image(grayscale_image, dither=True)
+            # Fetch the image
+            image_response = requests.get(image_url)
+            img = Image.open(io.BytesIO(image_response.content))
+            # Display the image
+            grayscale_image, dithered_image = preper_image(img)
+            st.image(img, caption="Fetched Cat Image")
+            # Your print logic here
+            print_image(grayscale_image, dither=True)
 
 # history tab
 with tab6:
