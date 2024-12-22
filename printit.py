@@ -799,16 +799,24 @@ with tab5:
 # history tab
 with tab6:
     st.subheader("Gallery of Last 15 Labels and Stickers")
-    saved_images = list_saved_images()
+    
+    # Store the image list in session state if not already present
+    if 'saved_images_list' not in st.session_state:
+        st.session_state.saved_images_list = list_saved_images()
+    
+    # Only update the list when the page loads or is refreshed
+    if st.button("Refresh Gallery"):
+        st.session_state.saved_images_list = list_saved_images()
+        st.rerun()
 
     cols_per_row = 3
-    for i in range(0, len(saved_images), cols_per_row):
+    for i in range(0, len(st.session_state.saved_images_list), cols_per_row):
         cols = st.columns(cols_per_row)
         for j in range(cols_per_row):
             idx = i + j
-            if idx < len(saved_images):
+            if idx < len(st.session_state.saved_images_list):
                 with cols[j]:
-                    image_path = saved_images[idx]
+                    image_path = st.session_state.saved_images_list[idx]
                     image = Image.open(image_path)
                     st.image(image, use_column_width=True)
 
