@@ -513,6 +513,27 @@ with tab1:
 
 # label
 with tab2:
+    # Check if Cat API key exists and is valid
+    cat_api_key = st.secrets.get("cat_api_key", "")
+    
+    if not cat_api_key or cat_api_key == "ask me":
+        st.warning("⚠️ Cat API key is not configured")
+        st.info("""
+        To enable the Cat API feature:
+        1. Get a free API key from [TheCatAPI](https://thecatapi.com/)
+        2. Add your key to `.streamlit/secrets.toml`:
+        ```toml
+        cat_api_key = "your_api_key_here"
+        ```
+        """)
+    else:
+        # Existing cat tab functionality
+        st.subheader("Cat Label Generator")
+        cat_breed = st.selectbox("Select Cat Breed", get_cat_breeds())
+        
+        if st.button("Get Random Cat"):
+            # ... rest of the existing cat code ...
+
     st.subheader(":printer: a label")
 
     img = ""
