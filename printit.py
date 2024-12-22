@@ -419,6 +419,22 @@ def img_concat_v(im1, im2, image_width=label_width):
     return dst
 
 
+def get_cat_breeds():
+    cat_api_key = st.secrets.get("cat_api_key", "")
+    if not cat_api_key or cat_api_key == "ask me":
+        return ["API key required"]
+    
+    try:
+        response = requests.get(
+            "https://api.thecatapi.com/v1/breeds",
+            headers={"x-api-key": cat_api_key}
+        )
+        breeds = response.json()
+        return [breed["name"] for breed in breeds]
+    except:
+        return ["Error fetching breeds"]
+
+
 # Streamlit app
 st.title("STICKER FACTORY")
 
@@ -532,7 +548,33 @@ with tab2:
         cat_breed = st.selectbox("Select Cat Breed", get_cat_breeds())
         
         if st.button("Get Random Cat"):
-            # ... rest of the existing cat code ...
+            try:
+                # Construct API URL with breed filter if selected
+                breed_id = next((breed["id"] for breed in requests.get("https://api.thecatapi.com/v1/breeds").json() if breed["name"] == cat_breed), None)
+                caturl = f"https://api.thecatapi.com/v1/images/search?breed_ids={breed_id}" if breed_id else "https://api.thecatapi.com/v1/images/search"
+                
+                # Add API key to request
+                headers = {"x-api-key": cat_api_key}
+                response = requests.get(caturl, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+
+                # Get image URL and fetch image
+                image_url = data[0]["url"]
+                image_response = requests.get(image_url)
+                image_response.raise_for_status()
+                img = Image.open(io.BytesIO(image_response.content))
+                
+                # Process and display image
+                grayscale_image, dithered_image = preper_image(img)
+                st.image(dithered_image, caption=f"Random {cat_breed} Cat")
+                
+                if st.button("Print Cat"):
+                    print_image(grayscale_image, dither=True)
+                    st.success("Cat sent to printer!")
+                    
+            except Exception as e:
+                st.error(f"Error fetching cat: {str(e)}")
 
     st.subheader(":printer: a label")
 
@@ -814,24 +856,31 @@ with tab5:
         """)
     else:
         if st.button("Fetch cat"):
-            caturl = "https://api.thecatapi.com/v1/images/search"
+            try:
+                caturl = "https://api.thecatapi.com/v1/images/search"
+                api_url = f"{caturl}?limit=1&type=static&api_key={cat_api_key}"
+                response = requests.get(api_url)
+                response.raise_for_status()  # Raise an exception for bad status codes
+                data = response.json()
 
-            # Fetch JSON data
-            api_url = f"{caturl}?limit=1&type=static&api_key={cat_api_key}"
-            response = requests.get(api_url)
-            data = response.json()
+                # Extract image URL from JSON
+                image_url = data[0]["url"]
 
-            # Extract image URL from JSON
-            image_url = data[0]["url"]
-
-            # Fetch the image
-            image_response = requests.get(image_url)
-            img = Image.open(io.BytesIO(image_response.content))
-            # Display the image
-            grayscale_image, dithered_image = preper_image(img)
-            st.image(img, caption="Fetched Cat Image")
-            # Your print logic here
-            print_image(grayscale_image, dither=True)
+                # Fetch the image
+                image_response = requests.get(image_url)
+                image_response.raise_for_status()
+                img = Image.open(io.BytesIO(image_response.content))
+                
+                # Process and display the image
+                grayscale_image, dithered_image = preper_image(img)
+                st.image(dithered_image, caption="Fetched Cat Image")
+                
+                if st.button("Print Cat"):
+                    print_image(grayscale_image, dither=True)
+                    st.success("Cat sent to printer!")
+                    
+            except Exception as e:
+                st.error(f"Error fetching cat: {str(e)}")
 
 # history tab
 with tab6:
