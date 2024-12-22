@@ -798,25 +798,68 @@ with tab5:
 
 # history tab
 with tab6:
-    st.subheader("Gallery of Last 15 Labels and Stickers")
+    st.subheader("Gallery of Labels and Stickers")
     
-    # Store the image list in session state if not already present
+    # Initialize session state variables if they don't exist
     if 'saved_images_list' not in st.session_state:
         st.session_state.saved_images_list = list_saved_images()
+    if 'page_number' not in st.session_state:
+        st.session_state.page_number = 0
+    if 'search_query' not in st.session_state:
+        st.session_state.search_query = ""
     
-    # Only update the list when the page loads or is refreshed
-    if st.button("Refresh Gallery"):
-        st.session_state.saved_images_list = list_saved_images()
-        st.rerun()
+    # Search and refresh controls in two columns
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        search_query = st.text_input("Search filenames", value=st.session_state.search_query)
+    with col2:
+        if st.button("Refresh Gallery"):
+            st.session_state.saved_images_list = list_saved_images()
+            st.session_state.page_number = 0
+            st.rerun()
 
+    # Filter images based on search query
+    filtered_images = [
+        img for img in st.session_state.saved_images_list 
+        if search_query.lower() in os.path.basename(img).lower()
+    ]
+
+    # Pagination
+    items_per_page = 9  # 3x3 grid
+    total_pages = max((len(filtered_images) - 1) // items_per_page + 1, 1)
+    
+    # Pagination controls
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col1:
+        if st.button("Previous", disabled=st.session_state.page_number <= 0):
+            st.session_state.page_number -= 1
+            st.rerun()
+    with col2:
+        st.write(f"Page {st.session_state.page_number + 1} of {total_pages}")
+    with col3:
+        if st.button("Next", disabled=st.session_state.page_number >= total_pages - 1):
+            st.session_state.page_number += 1
+            st.rerun()
+
+    # Calculate start and end indices for current page
+    start_idx = st.session_state.page_number * items_per_page
+    end_idx = min(start_idx + items_per_page, len(filtered_images))
+    
+    # Display current page images
     cols_per_row = 3
-    for i in range(0, len(st.session_state.saved_images_list), cols_per_row):
+    current_page_images = filtered_images[start_idx:end_idx]
+    
+    # Show total count of filtered images
+    st.caption(f"Showing {len(current_page_images)} of {len(filtered_images)} images")
+
+    # Display images in grid
+    for i in range(0, len(current_page_images), cols_per_row):
         cols = st.columns(cols_per_row)
         for j in range(cols_per_row):
             idx = i + j
-            if idx < len(st.session_state.saved_images_list):
+            if idx < len(current_page_images):
                 with cols[j]:
-                    image_path = st.session_state.saved_images_list[idx]
+                    image_path = current_page_images[idx]
                     image = Image.open(image_path)
                     st.image(image, use_column_width=True)
 
@@ -826,7 +869,7 @@ with tab6:
                     ).strftime("%Y-%m-%d %H:%M")
                     st.caption(f"{filename}\n{modified_time}")
 
-                    if st.button(f"Print", key=f"print_{idx}"):
+                    if st.button(f"Print", key=f"print_{idx}_{st.session_state.page_number}"):
                         print_image(image, dither=True)
                         st.success("Sent to printer!")
 
