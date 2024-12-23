@@ -1,5 +1,5 @@
 import streamlit as st
-from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
+from PIL import Image, ImageDraw, ImageFont, PngImagePlugin, ImageOps
 import requests
 import io
 import glob
@@ -442,6 +442,58 @@ def get_cat_breeds():
         return ["Error fetching breeds"]
 
 
+def apply_threshold(image, threshold):
+    # Ensure the image is in grayscale mode
+    if image.mode != 'L':
+        image = image.convert('L')
+
+    # Create a LUT with 256 entries
+    lut = [255 if i > threshold else 0 for i in range(256)]
+    return image.point(lut, mode='1')
+
+
+def resize_image_to_width(image, target_width_mm, current_dpi=300):
+    # Convert mm to inches (since DPI is dots per inch)
+    target_width_inch = target_width_mm / 25.4
+
+    # Calculate the target pixel width using the given DPI
+    target_width_px = int(target_width_inch * current_dpi)
+
+    # Get current dimensions
+    current_width = image.width
+
+    # Calculate scaling factor based on target width
+    scale_factor = target_width_px / current_width
+
+    # Calculate new height maintaining aspect ratio
+    new_height = int(image.height * scale_factor)
+
+    # Resize the image while maintaining the aspect ratio
+    resized_image = image.resize((target_width_px, new_height), Image.LANCZOS)
+
+    # If the resized width is less than label_width pixels, pad with white
+    if target_width_px < label_width:
+        new_image = Image.new("RGB", (label_width, new_height), (255, 255, 255))
+        new_image.paste(resized_image, ((label_width - target_width_px) // 2, 0))
+        resized_image = new_image
+
+    print(f"Image resized from {image.width}x{image.height} to {resized_image.width}x{resized_image.height} pixels.")
+    print(f"Target width was {target_width_mm}mm ({target_width_px}px)")
+    return resized_image
+
+
+def add_border(image, border_width=1):
+    """Add a thin black border around the image"""
+    if image.mode == '1':  # Binary image
+        # For binary images, create a new binary image with border
+        bordered = Image.new('1', (image.width + 2*border_width, image.height + 2*border_width), 0)  # 0 is black
+        bordered.paste(image, (border_width, border_width))
+        return bordered
+    else:
+        # For other modes, use ImageOps
+        return ImageOps.expand(image, border=border_width, fill='black')
+
+
 # Streamlit app
 if not os.path.exists(".streamlit/secrets.toml"):
     st.error("⚠️ No secrets.toml file found!")
@@ -458,8 +510,8 @@ st.title(st.secrets.get("title", "STICKER FACTORY"))
 
 st.subheader(":printer: hard copies of images and text")
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
-    ["Sticker", "Label", "Text2image", "Webcam", "Cat", "history", "FAQ"]
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
+    ["Sticker", "Label", "Text2image", "Webcam", "Cat", "Mask Pro", "history", "FAQ"]
 )
 
 # Initialize the session state for the prompt and image
@@ -853,8 +905,82 @@ with tab5:
             except Exception as e:
                 st.error(f"Error fetching cat: {str(e)}")
 
-# history tab
+# Add the new mask tab content before the history tab
 with tab6:
+    st.subheader("Mask Pro")
+    
+    uploaded_file = st.file_uploader("Choose an image for mask...", type=["jpg", "jpeg", "png"], key="mask_uploader")
+
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            print_choice = st.radio("Choose which image to print/save:", ("Original", "Threshold"))
+
+            st.text("General options:")
+            mirror_checkbox = st.checkbox("Mirror Mask", value=False)
+            border_checkbox = st.checkbox("Show border in preview", value=True, help="Adds a border in the preview to help visualize boundaries (not printed)")
+            
+            # Add target width in mm option
+            target_width_mm = st.number_input("Target Width (mm)", min_value=0, value=0)
+            
+            # Disable rotation if target width is specified
+            rotate_disabled = target_width_mm > 0
+            rotate_checkbox = st.checkbox("rotate 90deg", value=False, disabled=rotate_disabled)
+            if rotate_disabled and rotate_checkbox:
+                st.info("Rotation disabled when target width is specified")
+            
+            # Apply target width resizing if specified
+            if target_width_mm > 0:
+                image = resize_image_to_width(image, target_width_mm)
+            
+            if mirror_checkbox:
+                image = ImageOps.mirror(image)
+
+            # Process image based on choice
+            if print_choice == "Original":
+                dither = st.checkbox("Dither - approximate grey tones with dithering", value=True)
+                grayscale_image, dithered_image = preper_image(image)
+                display_image = dithered_image if dither else grayscale_image
+            else:  # Threshold
+                threshold_percent = st.slider("Threshold (%)", 0, 100, 50)
+                threshold = int(threshold_percent * 255 / 100)
+                display_image = apply_threshold(image, threshold)
+
+            # Create a copy for display with border if needed
+            preview_image = display_image.copy()
+            if border_checkbox:
+                preview_image = add_border(preview_image)
+
+        with col2:
+            st.image(preview_image, caption="Preview", use_column_width=True)
+
+        print_button_label = f"Print {print_choice} Image"
+        if print_choice == "Original" and dither:
+            print_button_label += ", Dithering"
+        if rotate_checkbox and not rotate_disabled:
+            print_button_label += ", Rotated 90°"
+        if mirror_checkbox:
+            print_button_label += ", Mirrored"
+        if target_width_mm > 0:
+            print_button_label += f", Width: {target_width_mm}mm"
+
+        if st.button(print_button_label):
+            rotate = 90 if (rotate_checkbox and not rotate_disabled) else 0
+            if print_choice == "Original":
+                success = print_image(grayscale_image, rotate=rotate, dither=dither)
+            else:
+                success = print_image(display_image, rotate=rotate, dither=False)
+                
+            if success:
+                st.success("Image printed successfully!")
+            else:
+                st.error("Printing failed. Please check the printer connection.")
+
+# history tab
+with tab7:
     st.subheader("Gallery of Labels and Stickers")
     
     # Initialize session state variables if they don't exist
@@ -944,7 +1070,7 @@ with tab6:
                         st.success("Sent to printer!")
 
 # faq
-with tab7:
+with tab8:
     st.subheader("FAQ:")
     st.markdown(
         """
