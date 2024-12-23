@@ -547,53 +547,6 @@ with tab1:
 
 # label
 with tab2:
-    # Check if Cat API key exists and is valid
-    cat_api_key = st.secrets.get("cat_api_key", "")
-    
-    if not cat_api_key or cat_api_key == "ask me":
-        st.warning("⚠️ Cat API key is not configured")
-        st.info("""
-        To enable the Cat API feature:
-        1. Get a free API key from [TheCatAPI](https://thecatapi.com/)
-        2. Add your key to `.streamlit/secrets.toml`:
-        ```toml
-        cat_api_key = "your_api_key_here"
-        ```
-        """)
-    else:
-        # Existing cat tab functionality
-        st.subheader("Cat Label Generator")
-        cat_breed = st.selectbox("Select Cat Breed", get_cat_breeds())
-        
-        if st.button("Get Random Cat"):
-            try:
-                # Construct API URL with breed filter if selected
-                breed_id = next((breed["id"] for breed in requests.get("https://api.thecatapi.com/v1/breeds").json() if breed["name"] == cat_breed), None)
-                caturl = f"https://api.thecatapi.com/v1/images/search?breed_ids={breed_id}" if breed_id else "https://api.thecatapi.com/v1/images/search"
-                
-                # Add API key to request
-                headers = {"x-api-key": cat_api_key}
-                response = requests.get(caturl, headers=headers)
-                response.raise_for_status()
-                data = response.json()
-
-                # Get image URL and fetch image
-                image_url = data[0]["url"]
-                image_response = requests.get(image_url)
-                image_response.raise_for_status()
-                img = Image.open(io.BytesIO(image_response.content))
-                
-                # Process and display image
-                grayscale_image, dithered_image = preper_image(img)
-                st.image(dithered_image, caption=f"Random {cat_breed} Cat")
-                
-                if st.button("Print Cat"):
-                    print_image(grayscale_image, dither=True)
-                    st.success("Cat sent to printer!")
-                    
-            except Exception as e:
-                st.error(f"Error fetching cat: {str(e)}")
-
     st.subheader(":printer: a label")
 
     img = ""
