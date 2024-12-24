@@ -771,7 +771,7 @@ with tab2:
         if imgqr and img:
             # add qr below the label
             imgqr = img_concat_v(img, imgqr)
-            st.image(imgqr, use_column_width=True)
+            st.image(imgqr, use_container_width=True)
             if st.button("Print sticker+qr"):
                 print_image(imgqr)
         elif imgqr and not (img):
@@ -780,7 +780,7 @@ with tab2:
                 print_image(imgqr)
 
     if text and not (qrurl):
-        st.image(img, use_column_width=True)
+        st.image(img, use_container_width=True)
         if st.button("Print sticker"):
             print_image(img)  # Needs definition
             st.success("sticker sent to printer")
@@ -955,7 +955,7 @@ with tab6:
                 preview_image = add_border(preview_image)
 
         with col2:
-            st.image(preview_image, caption="Preview", use_column_width=True)
+            st.image(preview_image, caption="Preview", use_container_width=True)
 
         print_button_label = f"Print {print_choice} Image"
         if print_choice == "Original" and dither:
@@ -1057,7 +1057,7 @@ with tab7:
                 with cols[j]:
                     image_path = current_page_images[idx]
                     image = Image.open(image_path)
-                    st.image(image, use_column_width=True)
+                    st.image(image, use_container_width=True)
 
                     filename = os.path.basename(image_path)
                     modified_time = datetime.fromtimestamp(
@@ -1084,4 +1084,4 @@ with tab8:
         PRINT ALOT is the best!
         """
     )
-    st.image(Image.open("assets/station_sm.jpg"), caption="TAMI printshop")
+    st.image(Image.open("assets/station_sm.jpg"), caption="TAMI printshop", use_container_width=True)
