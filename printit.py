@@ -890,46 +890,45 @@ with tab5:
     st.subheader(":printer: a cat")
     st.caption("from the fine folks at https://thecatapi.com/")
     
+    # Initialize session state for cat image if not exists
+    if 'cat_image' not in st.session_state:
+        st.session_state.cat_image = None
+        st.session_state.cat_dithered = None
+    
     # Check if Cat API key exists and is valid
     cat_api_key = st.secrets.get("cat_api_key", "")
     
     if not cat_api_key or cat_api_key == "ask me":
         st.warning("⚠️ Cat API key is not configured")
-        st.info("""
-        To enable the Cat API feature:
-        1. Get a free API key from [TheCatAPI](https://thecatapi.com/)
-        2. Add your key to `.streamlit/secrets.toml`:
-        ```toml
-        cat_api_key = "your_api_key_here"
-        ```
-        """)
+        st.info("Add your cat_api_key to .streamlit/secrets.toml")
     else:
         if st.button("Fetch cat"):
             try:
-                caturl = "https://api.thecatapi.com/v1/images/search"
-                api_url = f"{caturl}?limit=1&type=static&api_key={cat_api_key}"
-                response = requests.get(api_url)
-                response.raise_for_status()  # Raise an exception for bad status codes
-                data = response.json()
+                # Get cat image URL
+                response = requests.get(
+                    "https://api.thecatapi.com/v1/images/search",
+                    headers={"x-api-key": cat_api_key}
+                )
+                response.raise_for_status()
+                image_url = response.json()[0]["url"]
 
-                # Extract image URL from JSON
-                image_url = data[0]["url"]
-
-                # Fetch the image
-                image_response = requests.get(image_url)
-                image_response.raise_for_status()
-                img = Image.open(io.BytesIO(image_response.content))
-                
-                # Process and display the image
+                # Download and process image
+                img = Image.open(io.BytesIO(requests.get(image_url).content)).convert('RGB')
                 grayscale_image, dithered_image = preper_image(img)
-                st.image(dithered_image, caption="Fetched Cat Image")
                 
-                if st.button("Print Cat"):
-                    print_image(grayscale_image, dither=True)
-                    st.success("Cat sent to printer!")
-                    
+                # Store in session state
+                st.session_state.cat_image = grayscale_image
+                st.session_state.cat_dithered = dithered_image
+                
             except Exception as e:
                 st.error(f"Error fetching cat: {str(e)}")
+        
+        # Show image and print button if we have a cat
+        if st.session_state.cat_dithered is not None:
+            st.image(st.session_state.cat_dithered, caption="Cat!")
+            if st.button("Print Cat"):
+                print_image(st.session_state.cat_image, dither=True)
+                st.success("Cat sent to printer!")
 
 # Add the new mask tab content before the history tab
 with tab6:
@@ -996,14 +995,10 @@ with tab6:
         if st.button(print_button_label):
             rotate = 90 if (rotate_checkbox and not rotate_disabled) else 0
             if print_choice == "Original":
-                success = print_image(grayscale_image, rotate=rotate, dither=dither)
+                print_image(grayscale_image, rotate=rotate, dither=dither)
             else:
-                success = print_image(display_image, rotate=rotate, dither=False)
-                
-            if success:
-                st.success("Image printed successfully!")
-            else:
-                st.error("Printing failed. Please check the printer connection.")
+                print_image(display_image, rotate=rotate, dither=False)
+            st.success("Print job sent to printer!")
 
 # history tab
 with tab7:
