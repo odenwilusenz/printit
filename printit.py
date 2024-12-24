@@ -18,6 +18,7 @@ from brother_ql.backends.helpers import send
 from brother_ql import labels  # Import the labels module
 import usb.core
 import subprocess
+from job_queue import print_queue  # Import from renamed file
 
 
 def find_and_parse_printer():
@@ -337,6 +338,10 @@ def preper_image(image, label_width=label_width):
 
 
 def print_image(image, rotate=0, dither=False):
+    """
+    Queue a print job and return the job ID.
+    The actual printing will be handled by the print queue worker.
+    """
     # Ensure the temporary directory exists
     temp_dir = tempfile.gettempdir()
     os.makedirs(temp_dir, exist_ok=True)
@@ -355,59 +360,80 @@ def print_image(image, rotate=0, dither=False):
         st.error(
             "No Brother QL printer found. Please check the connection and try again."
         )
-        return
-
-    # Construct the print command for logging
-    command = f"brother_ql -b {printer_info['backend']} --model {printer_info['model']} -p {printer_info['identifier']} print -l {label_type} \"{temp_file_path}\""
-    print(f"Equivalent CLI command: \n{command}")  # Log the command to standard output
-
-    # Prepare the image for printing
-    qlr = BrotherQLRaster(printer_info["model"])
-    instructions = convert(
-        qlr=qlr,
-        images=[temp_file_path],
-        label=label_type,
-        rotate=rotate,
-        threshold=70,  # Default CLI threshold
-        dither=dither,
-        compress=True,  # CLI uses compression by default
-        red=False,
-        dpi_600=False,
-        hq=False,  # CLI doesn't use HQ by default
-        cut=True,
-    )
-
-    # Debug logging
-    print(f"""
-    Print parameters:
-    - Label type: {label_type}
-    - Rotate: {rotate}
-    - Dither: {dither}
-    - Model: {printer_info['model']}
-    - Backend: {printer_info['backend']}
-    - Identifier: {printer_info['identifier']}
-    """)
-
-    # Try to print using Python API
-    try:
-        success = send(
-            instructions=instructions,
-            printer_identifier=printer_info["identifier"],
-            backend_identifier="pyusb",
-        )
-        
-        if not success:
-            st.error("Failed to print using Python API")
-            return False
-            
-    except usb.core.USBError as e:
-        if "timeout error" in str(e):
-            print("USB timeout error occurred, but it's okay.")
-            return True
-        print(f"USBError encountered: {e}")
-        st.error(f"USBError encountered: {e}")
         return False
 
+    # Add job to print queue
+    job_id = print_queue.add_job(
+        image,
+        rotate=rotate,
+        dither=dither,
+        printer_info=printer_info,
+        temp_file_path=temp_file_path
+    )
+
+    # Start monitoring job status
+    status = print_queue.get_job_status(job_id)
+    
+    # Show job status in UI
+    status_container = st.empty()
+    while status.status in ["pending", "processing"]:
+        status_container.info(f"Print job status: {status.status}")
+        time.sleep(0.5)
+        status = print_queue.get_job_status(job_id)
+
+    if status.status == "completed":
+        status_container.success("Print job completed successfully!")
+        return True
+    else:
+        status_container.error(f"Print job failed: {status.error}")
+        return False
+
+# Add a new function to show queue status
+def show_queue_status():
+    """Show the current print queue status in the UI"""
+    # Check if queue view is enabled in secrets (default to False)
+    if not st.secrets.get("queueview", False):
+        return
+        
+    status = print_queue.get_queue_status()
+    
+    # Only show status if there are jobs in queue or currently processing
+    if status["queue_size"] > 0 or status["is_processing"]:
+        # Create a small container in the top-right corner
+        status_container = st.empty()
+        with status_container.container():
+            # Make the status display compact
+            st.markdown(
+                """
+                <style>
+                div[data-testid="stVerticalBlock"] > div {
+                    padding-top: 0;
+                    padding-bottom: 0;
+                    margin-top: -1em;
+                }
+                </style>
+                """, 
+                unsafe_allow_html=True
+            )
+            
+            # Use a single line for each job status
+            for job_id, job_info in status["jobs"].items():
+                status_color = {
+                    "pending": "🟡",
+                    "processing": "🔵",
+                    "completed": "🟢",
+                    "failed": "🔴"
+                }.get(job_info["status"], "⚪")
+                
+                # Show job ID (first 8 chars) and status
+                status_text = f"{status_color} Job {job_id[:8]}: {job_info['status']}"
+                if job_info["error"]:
+                    status_text += f" ({job_info['error']})"
+                st.write(status_text)
+
+# Add queue status display to the main UI
+if __name__ == "__main__":
+    show_queue_status()
 
 def find_url(string):
     url_pattern = re.compile(
