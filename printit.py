@@ -780,6 +780,15 @@ with tab2:
         if "selected_font" not in st.session_state:
             st.session_state.selected_font = fonts[0]
 
+        # Calculate initial max size with default font
+        try:
+            max_size = calculate_max_font_size(label_width, text, font)
+            font_size = max_size  # Set initial font size to max
+        except Exception as e:
+            max_size = 20  # Fallback size if calculation fails
+            font_size = max_size
+            print(f"Error calculating font size: {e}")
+
         fontstuff = st.checkbox("font settings", value=False)
         col1, col2 = st.columns(2)
         if fontstuff:
@@ -798,8 +807,13 @@ with tab2:
                 alignment = st.selectbox(
                     "Choose text alignment", alignment_options, index=1
                 )
+            # Recalculate max size if font changed
+            try:
+                max_size = calculate_max_font_size(label_width, text, font)
+            except Exception as e:
+                print(f"Error calculating font size for {font}: {e}")
             font_size = st.slider("Font Size", 5, max_size + 5, max_size)
-            font_size
+
         # Font Size
         try:
             fnt = ImageFont.truetype(font, font_size)
