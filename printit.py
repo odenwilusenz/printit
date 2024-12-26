@@ -351,10 +351,14 @@ def preper_image(image, label_width=label_width):
     # Debug print original image size
     # print(f"Original image size: {image.size}")
     
+    # Handle PNG transparency by adding white background
     if image.mode == "RGBA":
-        white_background = Image.new("RGBA", image.size, "white")
-        white_background.paste(image, mask=image.split()[3])
-        image = white_background
+        # Create a white background image
+        background = Image.new("RGBA", image.size, "white")
+        # Alpha composite the image over the white background
+        image = Image.alpha_composite(background, image)
+        # Convert to RGB after compositing
+        image = image.convert("RGB")
 
     # Only resize if the image width doesn't match label width
     width, height = image.size
