@@ -888,7 +888,7 @@ with tab2:
         if imgqr and img:
             # add qr below the label
             imgqr = img_concat_v(img, imgqr)
-            st.image(imgqr, use_column_width=True)
+            st.image(imgqr, use_container_width=True)
             if st.button("Print sticker+qr", key="print_sticker_qr"):
                 print_image(imgqr)
         elif imgqr and not (img):
@@ -896,7 +896,7 @@ with tab2:
                 print_image(imgqr)
 
     if text and not (qrurl):
-        st.image(img, use_column_width=True)
+        st.image(img, use_container_width=True)
         if st.button("Print sticker", key="print_text_only"):
             print_image(img)  # Needs definition
             st.success("sticker sent to printer")
@@ -1070,7 +1070,7 @@ with tab6:
                 preview_image = add_border(preview_image)
 
         with col2:
-            st.image(preview_image, caption="Preview", use_column_width=True)
+            st.image(preview_image, caption="Preview", use_container_width=True)
 
         print_button_label = f"Print {print_choice} Image"
         if print_choice == "Original" and dither:
@@ -1094,91 +1094,95 @@ with tab6:
 with tab7:
     st.subheader("Gallery of Labels and Stickers")
     
-    # Initialize session state variables if they don't exist
-    if 'saved_images_list' not in st.session_state:
-        st.session_state.saved_images_list = list_saved_images()
-    if 'page_number' not in st.session_state:
-        st.session_state.page_number = 0
-    if 'search_query' not in st.session_state:
-        st.session_state.search_query = ""
-    if 'filter_duplicates' not in st.session_state:
-        st.session_state.filter_duplicates = True
-    
-    # Get pagination settings from secrets with defaults
-    items_per_page = st.secrets.get("items_per_page", 5)  # Default to 3x3 grid
-    
-    # Search, filter, and refresh controls
-    col1, col2, col3 = st.columns([3, 2, 1])
-    with col1:
-        search_query = st.text_input("Search filenames", value=st.session_state.search_query)
-    with col2:
-        filter_duplicates = st.checkbox("Filter duplicates", value=st.session_state.filter_duplicates)
-        st.session_state.filter_duplicates = filter_duplicates
-    with col3:
-        if st.button("Refresh Gallery"):
+    # Only process history if this tab is selected
+    if tab7:  # This checks if the tab is active
+        # Initialize session state variables if they don't exist
+        if 'saved_images_list' not in st.session_state:
+            st.session_state.saved_images_list = list_saved_images()
+        if 'page_number' not in st.session_state:
+            st.session_state.page_number = 0
+        if 'search_query' not in st.session_state:
+            st.session_state.search_query = ""
+        if 'filter_duplicates' not in st.session_state:
+            st.session_state.filter_duplicates = True
+        
+        # Get pagination settings from secrets with defaults
+        items_per_page = st.secrets.get("items_per_page", 5)  # Default to 3x3 grid
+        
+        # Search, filter, and refresh controls
+        col1, col2, col3 = st.columns([3, 2, 1])
+        with col1:
+            search_query = st.text_input("Search filenames", value=st.session_state.search_query)
+        with col2:
+            filter_duplicates = st.checkbox("Filter duplicates", value=st.session_state.filter_duplicates)
+            st.session_state.filter_duplicates = filter_duplicates
+        with col3:
+            if st.button("Refresh Gallery"):
+                st.session_state.saved_images_list = list_saved_images(filter_duplicates)
+                st.session_state.page_number = 0
+                st.rerun()
+
+        # Update image list if filter setting changed
+        if filter_duplicates != st.session_state.filter_duplicates:
             st.session_state.saved_images_list = list_saved_images(filter_duplicates)
             st.session_state.page_number = 0
             st.rerun()
 
-    # Update image list if filter setting changed
-    if filter_duplicates != st.session_state.filter_duplicates:
-        st.session_state.saved_images_list = list_saved_images(filter_duplicates)
-        st.session_state.page_number = 0
-        st.rerun()
+        # Filter images based on search query
+        filtered_images = [
+            img for img in st.session_state.saved_images_list 
+            if search_query.lower() in os.path.basename(img).lower()
+        ]
 
-    # Filter images based on search query
-    filtered_images = [
-        img for img in st.session_state.saved_images_list 
-        if search_query.lower() in os.path.basename(img).lower()
-    ]
+        # Pagination
+        total_pages = max((len(filtered_images) - 1) // items_per_page + 1, 1)
+        
+        # Pagination controls
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col1:
+            if st.button("Previous", disabled=st.session_state.page_number <= 0):
+                st.session_state.page_number -= 1
+                st.rerun()
+        with col2:
+            st.write(f"Page {st.session_state.page_number + 1} of {total_pages}")
+        with col3:
+            if st.button("Next", disabled=st.session_state.page_number >= total_pages - 1):
+                st.session_state.page_number += 1
+                st.rerun()
 
-    # Pagination
-    total_pages = max((len(filtered_images) - 1) // items_per_page + 1, 1)
-    
-    # Pagination controls
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col1:
-        if st.button("Previous", disabled=st.session_state.page_number <= 0):
-            st.session_state.page_number -= 1
-            st.rerun()
-    with col2:
-        st.write(f"Page {st.session_state.page_number + 1} of {total_pages}")
-    with col3:
-        if st.button("Next", disabled=st.session_state.page_number >= total_pages - 1):
-            st.session_state.page_number += 1
-            st.rerun()
+        # Calculate start and end indices for current page
+        start_idx = st.session_state.page_number * items_per_page
+        end_idx = min(start_idx + items_per_page, len(filtered_images))
+        
+        # Display current page images
+        cols_per_row = 3
+        current_page_images = filtered_images[start_idx:end_idx]
+        
+        # Show total count of filtered images
+        st.caption(f"Showing {len(current_page_images)} of {len(filtered_images)} images")
 
-    # Calculate start and end indices for current page
-    start_idx = st.session_state.page_number * items_per_page
-    end_idx = min(start_idx + items_per_page, len(filtered_images))
-    
-    # Display current page images
-    cols_per_row = 3
-    current_page_images = filtered_images[start_idx:end_idx]
-    
-    # Show total count of filtered images
-    st.caption(f"Showing {len(current_page_images)} of {len(filtered_images)} images")
+        # Display images in grid
+        for i in range(0, len(current_page_images), cols_per_row):
+            cols = st.columns(cols_per_row)
+            for j in range(cols_per_row):
+                idx = i + j
+                if idx < len(current_page_images):
+                    with cols[j]:
+                        image_path = current_page_images[idx]
+                        image = Image.open(image_path)
+                        st.image(image, use_container_width=True)
 
-    # Display images in grid
-    for i in range(0, len(current_page_images), cols_per_row):
-        cols = st.columns(cols_per_row)
-        for j in range(cols_per_row):
-            idx = i + j
-            if idx < len(current_page_images):
-                with cols[j]:
-                    image_path = current_page_images[idx]
-                    image = Image.open(image_path)
-                    st.image(image, use_column_width=True)
+                        filename = os.path.basename(image_path)
+                        modified_time = datetime.fromtimestamp(
+                            os.path.getmtime(image_path)
+                        ).strftime("%Y-%m-%d %H:%M")
+                        st.caption(f"{filename}\n{modified_time}")
 
-                    filename = os.path.basename(image_path)
-                    modified_time = datetime.fromtimestamp(
-                        os.path.getmtime(image_path)
-                    ).strftime("%Y-%m-%d %H:%M")
-                    st.caption(f"{filename}\n{modified_time}")
-
-                    if st.button(f"Print", key=f"print_{idx}_{st.session_state.page_number}"):
-                        print_image(image, dither=True)
-                        st.success("Sent to printer!")
+                        if st.button(f"Print", key=f"print_{idx}_{st.session_state.page_number}"):
+                            print_image(image, dither=True)
+                            st.success("Sent to printer!")
+    else:
+        st.info("Select this tab to view history")
 
 # faq
 with tab8:
@@ -1195,4 +1199,4 @@ with tab8:
         PRINT ALOT is the best!
         """
     )
-    st.image(Image.open("assets/station_sm.jpg"), caption="TAMI printshop", use_column_width=True)
+    st.image(Image.open("assets/station_sm.jpg"), caption="TAMI printshop", use_container_width=True)
