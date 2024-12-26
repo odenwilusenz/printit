@@ -116,7 +116,8 @@ class PrintQueue:
                         job.params["printer_info"],
                         job.params["temp_file_path"],
                         rotate=job.params.get("rotate", 0),
-                        dither=job.params.get("dither", False)
+                        dither=job.params.get("dither", False),
+                        label_type=job.params.get("label_type", "102")
                     )
 
                     if success:

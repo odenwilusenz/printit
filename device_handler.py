@@ -2,39 +2,50 @@ from brother_ql.raster import BrotherQLRaster
 from brother_ql.conversion import convert
 from brother_ql.backends.helpers import send
 import usb.core
+import streamlit as st
 
-def process_print_job(image, printer_info, temp_file_path, rotate=0, dither=False, label_type="62"):
+def process_print_job(image, printer_info, temp_file_path, rotate=0, dither=False, label_type="102", debug=False):
     """
     Process a single print job.
     Returns (success, error_message)
     """
+    # Get debug flag from secrets if not explicitly passed
+    if not debug and 'debug' in st.secrets:
+        debug = st.secrets['debug']
+
     try:
         # Prepare the image for printing
         qlr = BrotherQLRaster(printer_info["model"])
+        
+        # Debug print before conversion
+        if debug:
+            print(f"Starting print job with label_type: {label_type}")
+        
         instructions = convert(
             qlr=qlr,
             images=[temp_file_path],
             label=label_type,
             rotate=rotate,
-            threshold=70,  # Default CLI threshold
+            threshold=70,
             dither=dither,
-            compress=True,  # CLI uses compression by default
+            compress=True,
             red=False,
             dpi_600=False,
-            hq=False,  # CLI doesn't use HQ by default
+            hq=False,
             cut=True,
         )
 
         # Debug logging
-        print(f"""
-        Print parameters:
-        - Label type: {label_type}
-        - Rotate: {rotate}
-        - Dither: {dither}
-        - Model: {printer_info['model']}
-        - Backend: {printer_info['backend']}
-        - Identifier: {printer_info['identifier']}
-        """)
+        if debug:
+            print(f"""
+            Print parameters:
+            - Label type: {label_type}
+            - Rotate: {rotate}
+            - Dither: {dither}
+            - Model: {printer_info['model']}
+            - Backend: {printer_info['backend']}
+            - Identifier: {printer_info['identifier']}
+            """)
 
         # Try to print using Python API
         success = send(
@@ -50,13 +61,16 @@ def process_print_job(image, printer_info, temp_file_path, rotate=0, dither=Fals
 
     except usb.core.USBError as e:
         if "timeout error" in str(e):
-            print("USB timeout error occurred, but it's okay.")
+            if debug:
+                print("USB timeout error occurred, but it's okay.")
             return True, None
         error_msg = f"USBError encountered: {e}"
-        print(error_msg)
+        if debug:
+            print(error_msg)
         return False, error_msg
 
     except Exception as e:
         error_msg = f"Unexpected error during printing: {str(e)}"
-        print(error_msg)
+        if debug:
+            print(error_msg)
         return False, error_msg 

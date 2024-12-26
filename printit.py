@@ -22,38 +22,71 @@ from job_queue import print_queue  # Import from renamed file
 
 
 def find_and_parse_printer():
+    """Find and parse Brother QL printer information."""
     model_manager = ModelsManager()
+    
+    # Debug print to show we're searching
+    print("Searching for Brother QL printer...")
 
     for backend_name in ["pyusb", "linux_kernel"]:
-        backend = backend_factory(backend_name)
-        for printer in backend["list_available_devices"]():
-            identifier = printer["identifier"]
-            parts = identifier.split("/")
+        try:
+            print(f"Trying backend: {backend_name}")
+            backend = backend_factory(backend_name)
+            available_devices = backend["list_available_devices"]()
+            print(f"Found {len(available_devices)} devices with {backend_name} backend")
+            
+            for printer in available_devices:
+                print(f"Found device: {printer}")
+                identifier = printer["identifier"]
+                parts = identifier.split("/")
 
-            if len(parts) < 4:
-                continue
+                if len(parts) < 4:
+                    print(f"Skipping device with invalid identifier format: {identifier}")
+                    continue
 
-            protocol = parts[0]
-            device_info = parts[2]
-            serial_number = parts[3]
-            vendor_id, product_id = device_info.split(":")
+                protocol = parts[0]
+                device_info = parts[2]
+                serial_number = parts[3]
+                
+                try:
+                    vendor_id, product_id = device_info.split(":")
+                except ValueError:
+                    print(f"Invalid device info format: {device_info}")
+                    continue
 
-            model = "QL-570"  # default model
-            for m in model_manager.iter_elements():
-                if m.product_id == int(product_id, 16):
-                    model = m.identifier
-                    break
+                # Default model
+                model = "QL-570"
+                
+                # Try to match product ID to determine actual model
+                try:
+                    product_id_int = int(product_id, 16)
+                    for m in model_manager.iter_elements():
+                        if m.product_id == product_id_int:
+                            model = m.identifier
+                            break
+                    print(f"Matched printer model: {model}")
+                except ValueError:
+                    print(f"Invalid product ID format: {product_id}")
+                    continue
 
-            return {
-                "identifier": identifier,
-                "backend": backend_name,
-                "model": model,
-                "protocol": protocol,
-                "vendor_id": vendor_id,
-                "product_id": product_id,
-                "serial_number": serial_number,
-            }       
-        return None
+                printer_info = {
+                    "identifier": identifier,
+                    "backend": backend_name,
+                    "model": model,
+                    "protocol": protocol,
+                    "vendor_id": vendor_id,
+                    "product_id": product_id,
+                    "serial_number": serial_number,
+                }
+                print(f"Found printer: {printer_info}")
+                return printer_info
+                
+        except Exception as e:
+            print(f"Error with backend {backend_name}: {str(e)}")
+            continue
+
+    print("No Brother QL printer found")
+    return None
 
 def get_printer_label_info():
     printer_info = find_and_parse_printer()
@@ -99,11 +132,13 @@ def get_printer_label_info():
         
         if media_width_mm in label_sizes:
             label_type = label_sizes[media_width_mm]
+            print(f"Mapped {media_width_mm}mm to label type {label_type}")  # Debug print
             return label_type, f"Detected {label_type} ({media_width_mm}mm)"
         
         return None, f"Unknown label width: {media_width_mm}mm"
         
     except Exception as e:
+        print(f"Error getting printer status: {str(e)}")  # Debug print
         return None, f"Error getting printer status: {str(e)}"
 
 def get_label_type():
@@ -116,15 +151,19 @@ def get_label_type():
     # Try to detect from printer's current media
     detected_label, status_message = get_printer_label_info()
     if detected_label:
+        print(f"Using detected label type: {detected_label} - {status_message}")  # Debug print
         return detected_label, status_message
 
     # Try to get from secrets.toml
     if "label_type" in st.secrets:
-        return st.secrets["label_type"], "Using configured label_type from secrets"
+        configured_type = st.secrets["label_type"]
+        print(f"Using configured label type from secrets: {configured_type}")  # Debug print
+        return configured_type, "Using configured label_type from secrets"
 
     # If neither works, return default with warning
-    st.warning("⚠️ No label type detected from printer and none configured in secrets.toml. Using default label type 62")
-    return "62", "Using default label type 62"
+    print("No label type detected or configured, using default 102")  # Debug print
+    st.warning("⚠️ No label type detected from printer and none configured in secrets.toml. Using default label type 102")
+    return "102", "Using default label type 102"
 
 # Get label type and status message
 label_type, label_status = get_label_type()
@@ -362,13 +401,18 @@ def print_image(image, rotate=0, dither=False):
         )
         return False
 
-    # Add job to print queue
+    # Get the current label type
+    label_type, _ = get_label_type()
+    print(f"Using label type: {label_type}")  # Debug print
+
+    # Add job to print queue with correct label type
     job_id = print_queue.add_job(
         image,
         rotate=rotate,
         dither=dither,
         printer_info=printer_info,
-        temp_file_path=temp_file_path
+        temp_file_path=temp_file_path,
+        label_type=label_type  # Add label_type to the job parameters
     )
 
     # Start monitoring job status
@@ -797,7 +841,7 @@ with tab2:
         if imgqr and img:
             # add qr below the label
             imgqr = img_concat_v(img, imgqr)
-            st.image(imgqr, use_container_width=True)
+            st.image(imgqr, use_column_width=True)
             if st.button("Print sticker+qr"):
                 print_image(imgqr)
         elif imgqr and not (img):
@@ -806,7 +850,7 @@ with tab2:
                 print_image(imgqr)
 
     if text and not (qrurl):
-        st.image(img, use_container_width=True)
+        st.image(img, use_column_width=True)
         if st.button("Print sticker"):
             print_image(img)  # Needs definition
             st.success("sticker sent to printer")
@@ -980,7 +1024,7 @@ with tab6:
                 preview_image = add_border(preview_image)
 
         with col2:
-            st.image(preview_image, caption="Preview", use_container_width=True)
+            st.image(preview_image, caption="Preview", use_column_width=True)
 
         print_button_label = f"Print {print_choice} Image"
         if print_choice == "Original" and dither:
@@ -1078,7 +1122,7 @@ with tab7:
                 with cols[j]:
                     image_path = current_page_images[idx]
                     image = Image.open(image_path)
-                    st.image(image, use_container_width=True)
+                    st.image(image, use_column_width=True)
 
                     filename = os.path.basename(image_path)
                     modified_time = datetime.fromtimestamp(
@@ -1105,4 +1149,4 @@ with tab8:
         PRINT ALOT is the best!
         """
     )
-    st.image(Image.open("assets/station_sm.jpg"), caption="TAMI printshop", use_container_width=True)
+    st.image(Image.open("assets/station_sm.jpg"), caption="TAMI printshop", use_column_width=True)
