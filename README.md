@@ -81,7 +81,7 @@ you can also run a service for this.
 
 ### windows
 to get the brother_ql lib to detect the printer, you need to install a usb filter 
- - grab release from [zdiag](https://github.com/zdiag/zdiag)
+ - grab release from [zdiag](https://zadig.akeo.ie/)
  - refresh device list
  - install the filter 'lib-winUSB` ,replacing the ql-XXXX driver
  - replug the printer
