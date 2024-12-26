@@ -282,35 +282,19 @@ def list_saved_images(filter_duplicates=True):
     return sorted(unique_images.values(), key=os.path.getmtime, reverse=True)[:history_limit]
 
 
-# Function to find .ttf fonts
-def find_fonts():
-    font_dirs = [
-        "fonts",  # Local fonts directory
-        "/usr/share/fonts/",  # Linux system fonts
-        "C:/Windows/Fonts/",  # Windows system fonts
-        os.path.expanduser("~/.fonts/"),  # Linux user fonts
-        os.path.expanduser("~/Library/Fonts/"),  # macOS user fonts
-        "/Library/Fonts/",  # macOS system fonts
+# Replace the find_fonts function with a simpler web-safe fonts list
+def get_web_safe_fonts():
+    """Return a list of web-safe fonts that should be available in most systems"""
+    return [
+        "Arial",
+        "Helvetica",
+        "Times New Roman",
+        "Courier New",
+        "Verdana",
+        "Georgia",
+        "Tahoma",
+        "Impact"
     ]
-
-    fonts = []
-    for dir in font_dirs:
-        if os.path.exists(dir):
-            # Walk through directory and subdirectories
-            for root, _, files in os.walk(dir):
-                for file in files:
-                    if file.lower().endswith((".ttf", ".otf")):  # Added .otf support
-                        try:
-                            font_path = os.path.join(root, file)
-                            # Verify it's a valid font by attempting to load it
-                            ImageFont.truetype(font_path, 12)
-                            fonts.append(font_path)
-                        except Exception:
-                            # Skip invalid fonts
-                            continue
-
-    # Remove duplicates while preserving order
-    return list(dict.fromkeys(fonts))
 
 
 def safe_filename(text):
@@ -788,16 +772,13 @@ with tab2:
                 st.write(url)
 
         # init some font vars
-        available_fonts = find_fonts()
-        font = available_fonts[0]
+        fonts = get_web_safe_fonts()
+        font = fonts[0]  # Default to first font
         alignment = "center"
-        fnt = ImageFont.truetype(font, 20)  # Initialize Font
-        max_size = calculate_max_font_size(label_width, text, font)
-        font_size = max_size
-
+        
         # Initialize font selection in session state if not already present
         if "selected_font" not in st.session_state:
-            st.session_state.selected_font = available_fonts[0]
+            st.session_state.selected_font = fonts[0]
 
         fontstuff = st.checkbox("font settings", value=False)
         col1, col2 = st.columns(2)
@@ -806,8 +787,8 @@ with tab2:
             with col1:
                 font = st.selectbox(
                     "Choose your font",
-                    available_fonts,
-                    index=available_fonts.index(st.session_state.selected_font),
+                    fonts,
+                    index=fonts.index(st.session_state.selected_font),
                 )
                 st.session_state.selected_font = font
 
@@ -820,7 +801,12 @@ with tab2:
             font_size = st.slider("Font Size", 5, max_size + 5, max_size)
             font_size
         # Font Size
-        fnt = ImageFont.truetype(font, font_size)  # Initialize Font
+        try:
+            fnt = ImageFont.truetype(font, font_size)
+        except OSError:
+            # If the font is not found, fall back to default
+            fnt = ImageFont.load_default()
+            st.warning(f"Font {font} not found, using default font")
         line_spacing = 20  # Adjust this value to set the desired line spacing
 
         # Calculate the new image height based on the bounding boxes
