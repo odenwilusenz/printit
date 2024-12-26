@@ -20,6 +20,10 @@ import usb.core
 import subprocess
 from job_queue import print_queue  # Import from renamed file
 
+# After the imports, before the functions
+if 'label_type' not in st.session_state:
+    st.session_state.label_type = None
+    st.session_state.label_status = None
 
 def find_and_parse_printer():
     """Find and parse Brother QL printer information."""
@@ -94,76 +98,115 @@ def get_printer_label_info():
         return None, "No printer found"
     
     try:
-        # Use brother_ql command line tool to get status
+        # First try to get status using brother_ql command line tool
         cmd = f"brother_ql -b pyusb --model {printer_info['model']} -p {printer_info['identifier']} status"
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         
-        if result.returncode != 0:
-            return None, "Could not get printer status"
+        # If command succeeded and we got output
+        if result.returncode == 0 and result.stdout:
+            status_output = result.stdout
+            print(f"Printer status output: {status_output}")  # Debug print
+            
+            # Parse the status output
+            media_width_mm = None
+            
+            for line in status_output.split('\n'):
+                if 'Media size:' in line:
+                    try:
+                        # Extract just the number before 'x'
+                        width_str = line.split(':')[1].split('x')[0].strip()
+                        media_width_mm = int(width_str)
+                        print(f"Detected media width: {media_width_mm}mm")  # Debug print
+                    except ValueError:
+                        continue
+            
+            if media_width_mm is not None:
+                # Map physical width in mm to brother_ql label types
+                label_sizes = {
+                    12: "12",     # 106 dots printable
+                    29: "29",     # 306 dots printable
+                    38: "38",     # 413 dots printable
+                    50: "50",     # 554 dots printable
+                    54: "54",     # 590 dots printable
+                    62: "62",     # 696 dots printable
+                    102: "102",   # 1164 dots printable
+                    103: "103",   # 1200 dots printable
+                    104: "104"    # 1200 dots printable
+                }
+                
+                if media_width_mm in label_sizes:
+                    label_type = label_sizes[media_width_mm]
+                    return label_type, f"Detected {label_type} ({media_width_mm}mm)"
         
-        status_output = result.stdout
-        print(f"Printer status output: {status_output}")  # Debug print
+        # If we couldn't get the width from status, check if it's in printer_info
+        if 'model' in printer_info:
+            # Default mappings for common models
+            model_defaults = {
+                'QL-500': "62",
+                'QL-550': "62",
+                'QL-560': "62",
+                'QL-570': "62",
+                'QL-580N': "62",
+                'QL-650TD': "62",
+                'QL-700': "62",
+                'QL-710W': "62",
+                'QL-720NW': "62",
+                'QL-800': "62",
+                'QL-810W': "62",
+                'QL-820NWB': "62",
+                'QL-1050': "102",
+                'QL-1060N': "102",
+            }
+            if printer_info['model'] in model_defaults:
+                return model_defaults[printer_info['model']], f"Using default for {printer_info['model']}"
         
-        # Parse the status output
-        media_width_mm = None
-        
-        for line in status_output.split('\n'):
-            if 'Media size:' in line:
-                try:
-                    # Extract just the number before 'x'
-                    width_str = line.split(':')[1].split('x')[0].strip()
-                    media_width_mm = int(width_str)
-                    print(f"Detected media width: {media_width_mm}mm")  # Debug print
-                except ValueError:
-                    continue
-        
-        # Map physical width in mm to brother_ql label types
-        label_sizes = {
-            12: "12",     # 106 dots printable
-            29: "29",     # 306 dots printable
-            38: "38",     # 413 dots printable
-            50: "50",     # 554 dots printable
-            54: "54",     # 590 dots printable
-            62: "62",     # 696 dots printable
-            102: "102",   # 1164 dots printable
-            103: "103",   # 1200 dots printable
-            104: "104"    # 1200 dots printable
-        }
-        
-        if media_width_mm in label_sizes:
-            label_type = label_sizes[media_width_mm]
-            print(f"Mapped {media_width_mm}mm to label type {label_type}")  # Debug print
-            return label_type, f"Detected {label_type} ({media_width_mm}mm)"
-        
-        return None, f"Unknown label width: {media_width_mm}mm"
+        # If all else fails, return a safe default
+        return "62", "Using safe default width"
         
     except Exception as e:
         print(f"Error getting printer status: {str(e)}")  # Debug print
-        return None, f"Error getting printer status: {str(e)}"
+        return "62", f"Error getting printer status, using default"
 
 def get_label_type():
     """
     Determine label type in order of precedence:
-    1. From printer's current media (most accurate)
-    2. From secrets.toml configuration (fallback)
-    3. Default to "62" with warning
+    1. From session state if already detected
+    2. From printer's current media (most accurate)
+    3. From secrets.toml configuration (fallback)
+    4. Default to "62" with warning
     """
+    # First check if we already have the label type in session state
+    if st.session_state.label_type is not None:
+        return st.session_state.label_type, st.session_state.label_status
+
     # Try to detect from printer's current media
     detected_label, status_message = get_printer_label_info()
     if detected_label:
         print(f"Using detected label type: {detected_label} - {status_message}")  # Debug print
+        # Store in session state
+        st.session_state.label_type = detected_label
+        st.session_state.label_status = status_message
         return detected_label, status_message
 
     # Try to get from secrets.toml
     if "label_type" in st.secrets:
         configured_type = st.secrets["label_type"]
+        status = "Using configured label_type from secrets"
         print(f"Using configured label type from secrets: {configured_type}")  # Debug print
-        return configured_type, "Using configured label_type from secrets"
+        # Store in session state
+        st.session_state.label_type = configured_type
+        st.session_state.label_status = status
+        return configured_type, status
 
     # If neither works, return default with warning
-    print("No label type detected or configured, using default 102")  # Debug print
-    st.warning("⚠️ No label type detected from printer and none configured in secrets.toml. Using default label type 102")
-    return "102", "Using default label type 102"
+    default_type = "62"
+    status = "Using default label type 62"
+    print("No label type detected or configured, using default 62")  # Debug print
+    st.warning("⚠️ No label type detected from printer and none configured in secrets.toml. Using default label type 62")
+    # Store in session state
+    st.session_state.label_type = default_type
+    st.session_state.label_status = status
+    return default_type, status
 
 # Get label type and status message
 label_type, label_status = get_label_type()
