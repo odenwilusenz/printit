@@ -842,16 +842,15 @@ with tab2:
             # add qr below the label
             imgqr = img_concat_v(img, imgqr)
             st.image(imgqr, use_column_width=True)
-            if st.button("Print sticker+qr"):
+            if st.button("Print sticker+qr", key="print_sticker_qr"):
                 print_image(imgqr)
         elif imgqr and not (img):
-            # st.image(imgqr, use_column_width=True)
-            if st.button("Print sticker"):
+            if st.button("Print sticker", key="print_qr_only"):
                 print_image(imgqr)
 
     if text and not (qrurl):
         st.image(img, use_column_width=True)
-        if st.button("Print sticker"):
+        if st.button("Print sticker", key="print_text_only"):
             print_image(img)  # Needs definition
             st.success("sticker sent to printer")
     st.markdown(
@@ -888,11 +887,11 @@ with tab3:
 
         col3, col4 = st.columns(2)
         with col3:
-            if st.button("Print Original Image"):
+            if st.button("Print Original Image", key="print_original_t2i"):
                 print_image(grayscale_image)
                 st.success("Original image sent to printer!")
         with col4:
-            if st.button("Print Dithered Image"):
+            if st.button("Print Dithered Image", key="print_dithered_t2i"):
                 print_image(grayscale_image, dither=True)
                 st.success("Dithered image sent to printer!")
 
@@ -920,12 +919,12 @@ with tab4:
             # print options
             colc, cold = st.columns(2)
             with colc:
-                if st.button("Print rotated Image"):
+                if st.button("Print rotated Image", key="print_rotated_webcam"):
                     print_image(grayscale_image, rotate=90, dither=True)
                     st.balloons()
                     st.success("rotated image sent to printer!")
             with cold:
-                if st.button("Print Image"):
+                if st.button("Print Image", key="print_webcam"):
                     print_image(grayscale_image, dither=True)
                     st.success("image sent to printer!")
 
@@ -970,7 +969,7 @@ with tab5:
         # Show image and print button if we have a cat
         if st.session_state.cat_dithered is not None:
             st.image(st.session_state.cat_dithered, caption="Cat!")
-            if st.button("Print Cat"):
+            if st.button("Print Cat", key="print_cat"):
                 print_image(st.session_state.cat_image, dither=True)
                 st.success("Cat sent to printer!")
 
