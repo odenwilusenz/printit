@@ -595,6 +595,13 @@ def add_border(image, border_width=1):
         return ImageOps.expand(image, border=border_width, fill='black')
 
 
+def apply_histogram_equalization(image):
+    """Apply histogram equalization to an image"""
+    if image.mode != 'L':
+        image = image.convert('L')
+    return ImageOps.equalize(image)
+
+
 # Streamlit app
 if not os.path.exists(".streamlit/secrets.toml"):
     st.error("⚠️ No secrets.toml file found!")
@@ -1037,6 +1044,7 @@ with tab6:
             st.text("General options:")
             mirror_checkbox = st.checkbox("Mirror Mask", value=False)
             border_checkbox = st.checkbox("Show border in preview", value=True, help="Adds a border in the preview to help visualize boundaries (not printed)")
+            equalize_checkbox = st.checkbox("Apply Histogram Equalization", value=False, help="Enhance image contrast")
             
             # Add target width in mm option
             target_width_mm = st.number_input("Target Width (mm)", min_value=0, value=0)
@@ -1053,6 +1061,10 @@ with tab6:
             
             if mirror_checkbox:
                 image = ImageOps.mirror(image)
+
+            # Apply histogram equalization if selected
+            if equalize_checkbox:
+                image = apply_histogram_equalization(image)
 
             # Process image based on choice
             if print_choice == "Original":
