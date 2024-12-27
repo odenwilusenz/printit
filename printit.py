@@ -282,18 +282,26 @@ def list_saved_images(filter_duplicates=True):
     return sorted(unique_images.values(), key=os.path.getmtime, reverse=True)[:history_limit]
 
 
-# Replace the find_fonts function with a simpler web-safe fonts list
-def get_web_safe_fonts():
-    """Return a list of web-safe fonts that should be available in most systems"""
+# Replace the get_fonts function
+def get_fonts():
+    """Return list of fonts with 5x5-Tami.ttf as default"""
+    default_font = "fonts/5x5-Tami.ttf"
+    
+    # Check if our default font exists
+    if os.path.exists(default_font):
+        try:
+            # Verify it's a valid font
+            ImageFont.truetype(default_font, 12)
+            return [default_font]  # Only return our custom font if it exists and works
+        except Exception as e:
+            print(f"Error loading 5x5-Tami.ttf: {e}")
+    
+    # If we get here, either the font doesn't exist or failed to load
+    # Return system fonts as fallback
     return [
-        "Arial",
-        "Helvetica",
-        "Times New Roman",
-        "Courier New",
-        "Verdana",
-        "Georgia",
-        "Tahoma",
-        "Impact"
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
+        "C:/Windows/Fonts/arial.ttf",  # Windows
+        "/System/Library/Fonts/Helvetica.ttf",  # macOS
     ]
 
 
@@ -742,31 +750,39 @@ with tab2:
     def calculate_max_font_size(
         width, text, font_path, start_size=10, end_size=200, step=1
     ):
-        draw = ImageDraw.Draw(
-            Image.new("RGB", (1, 1), color="white")
-        )  # Dummy image for calculation
-        max_font_size = start_size
+        try:
+            draw = ImageDraw.Draw(
+                Image.new("RGB", (1, 1), color="white")
+            )  # Dummy image for calculation
+            max_font_size = start_size
 
-        for size in range(start_size, end_size, step):
-            font = ImageFont.truetype(font_path, size)
-            adjusted_lines = []
-            for line in text.split("\n"):
-                adjusted_lines.append(line)
+            for size in range(start_size, end_size, step):
+                try:
+                    font = ImageFont.truetype(font_path, size)
+                except OSError:
+                    # If can't load font, use default
+                    return 50  # Return reasonable default size
+                adjusted_lines = []
+                for line in text.split("\n"):
+                    adjusted_lines.append(line)
 
-            max_text_width = max(
-                [
-                    draw.textbbox((0, 0), line, font=font)[2]
-                    for line in adjusted_lines
-                    if line.strip()
-                ]
-            )
+                max_text_width = max(
+                    [
+                        draw.textbbox((0, 0), line, font=font)[2]
+                        for line in adjusted_lines
+                        if line.strip()
+                    ]
+                )
 
-            if max_text_width <= width:
-                max_font_size = size
-            else:
-                break
+                if max_text_width <= width:
+                    max_font_size = size
+                else:
+                    break
 
-        return max_font_size
+            return max_font_size
+        except Exception as e:
+            print(f"Error in calculate_max_font_size: {e}")
+            return 50  # Return reasonable default size if anything fails
 
     # Multiline Text Input
     text = st.text_area("Enter your text to print", "write something", height=200)
@@ -779,22 +795,76 @@ with tab2:
                 st.write(url)
 
         # init some font vars
-        fonts = get_web_safe_fonts()
-        font = fonts[0]  # Default to first font
+        fonts = get_fonts()
+        font = fonts[0]  # Default to first available font
         alignment = "center"
         
         # Initialize font selection in session state if not already present
         if "selected_font" not in st.session_state:
             st.session_state.selected_font = fonts[0]
 
+        try:
+            # Try to load the font
+            test_font = ImageFont.truetype(font, 12)
+        except OSError:
+            st.error("5x5-Tami.ttf font not found! Please ensure the fonts directory exists and contains 5x5-Tami.ttf")
+            st.info("You can download it from the project repository")
+            font = None  # Mark font as unavailable
+            
+        if font is None:
+            st.stop()  # Stop execution if font is not available
+
         # Calculate initial max size with default font
         try:
-            max_size = calculate_max_font_size(label_width, text, font)
-            font_size = max_size  # Set initial font size to max
+            # For 5x5 font, calculate size based on label width
+            if font == "fonts/5x5-Tami.ttf":
+                # Get the longest line length
+                chars_per_line = max(len(line) for line in text.split('\n'))
+                if chars_per_line == 0:
+                    chars_per_line = 1
+                
+                print(f"Debug font sizing:")
+                print(f"- Label width: {label_width} dots")
+                print(f"- Longest line: {chars_per_line} characters")
+                
+                # Base size on "write something" which looks good at 107 on a 696-dot label
+                # Scale the base size according to the current label width
+                base_text_length = 14  # "write something" length
+                base_label_width = 696  # Width for which 107 looks good
+                base_font_size = 107
+                
+                # Scale base font size according to label width
+                width_scale = label_width / base_label_width
+                scaled_base_size = int(base_font_size * width_scale)
+                
+                print(f"- Base label width: {base_label_width} dots")
+                print(f"- Current label width: {label_width} dots")
+                print(f"- Width scale factor: {width_scale:.2f}")
+                print(f"- Scaled base size: {scaled_base_size}")
+                
+                # Now scale according to text length
+                font_size = int(scaled_base_size * (base_text_length / chars_per_line))
+                
+                # Ensure minimum size of 50
+                font_size = max(font_size, 50)
+                
+                print(f"- Final font size: {font_size}")
+                
+                max_size = font_size
+            else:
+                max_size = calculate_max_font_size(label_width, text, font)
+                font_size = max_size
         except Exception as e:
-            max_size = 20  # Fallback size if calculation fails
+            max_size = 107  # Default to known good size
             font_size = max_size
             print(f"Error calculating font size: {e}")
+
+        # After font size is set, print debug info about the final text layout
+        print(f"\nFinal text layout:")
+        print(f"- Font: {font}")
+        print(f"- Font size: {font_size}")
+        print(f"- Label width: {label_width}")
+        print(f"- Text: {text}")
 
         fontstuff = st.checkbox("font settings", value=False)
         col1, col2 = st.columns(2)
@@ -816,18 +886,32 @@ with tab2:
                 )
             # Recalculate max size if font changed
             try:
-                max_size = calculate_max_font_size(label_width, text, font)
+                if font == "fonts/5x5-Tami.ttf":
+                    chars_per_line = max(len(line) for line in text.split('\n'))
+                    if chars_per_line == 0:
+                        chars_per_line = 1
+                    # Use same calculation as above
+                    base_text_length = 14
+                    base_font_size = 107
+                    font_size = int(base_font_size * (base_text_length / chars_per_line))
+                    font_size = max(font_size, 50)
+                    max_size = font_size
+                else:
+                    max_size = calculate_max_font_size(label_width, text, font)
             except Exception as e:
                 print(f"Error calculating font size for {font}: {e}")
-            font_size = st.slider("Font Size", 5, max_size + 5, max_size)
+            font_size = st.slider("Font Size", 50, max_size + 50, max_size)
 
         # Font Size
         try:
             fnt = ImageFont.truetype(font, font_size)
         except OSError:
-            # If the font is not found, fall back to default
-            fnt = ImageFont.load_default()
-            st.warning(f"Font {font} not found, using default font")
+            # If the 5x5 font is not found, try to use default system font
+            try:
+                fnt = ImageFont.load_default()
+                st.warning(f"Font {font} not found, using default font. Please ensure fonts/5x5-Tami.ttf exists.")
+            except Exception as e:
+                st.error(f"Error loading font: {e}")
         line_spacing = 20  # Adjust this value to set the desired line spacing
 
         # Calculate the new image height based on the bounding boxes
@@ -1031,76 +1115,87 @@ with tab5:
 with tab6:
     st.subheader("Mask Pro")
     
-    uploaded_file = st.file_uploader("Choose an image for mask...", type=["jpg", "jpeg", "png"], key="mask_uploader")
+    uploaded_file = st.file_uploader("Choose an image for mask...", type=["jpg", "jpeg", "png", "gif", "webp", "bmp"], key="mask_uploader")
 
     if uploaded_file is not None:
-        image = Image.open(uploaded_file)
-        
-        col1, col2 = st.columns([1, 1])
+        try:
+            # Load and convert image to RGB to ensure compatibility
+            image = Image.open(uploaded_file)
+            if image.mode == "RGBA":
+                # Handle transparency
+                background = Image.new("RGBA", image.size, "white")
+                image = Image.alpha_composite(background, image)
+            image = image.convert("RGB")
+            
+            col1, col2 = st.columns([1, 1])
 
-        with col1:
-            print_choice = st.radio("Choose which image to print/save:", ("Original", "Threshold"))
+            with col1:
+                print_choice = st.radio("Choose which image to print/save:", ("Original", "Threshold"))
 
-            st.text("General options:")
-            mirror_checkbox = st.checkbox("Mirror Mask", value=False)
-            border_checkbox = st.checkbox("Show border in preview", value=True, help="Adds a border in the preview to help visualize boundaries (not printed)")
-            equalize_checkbox = st.checkbox("Apply Histogram Equalization", value=False, help="Enhance image contrast")
-            
-            # Add target width in mm option
-            target_width_mm = st.number_input("Target Width (mm)", min_value=0, value=0)
-            
-            # Disable rotation if target width is specified
-            rotate_disabled = target_width_mm > 0
-            rotate_checkbox = st.checkbox("rotate 90deg", value=False, disabled=rotate_disabled)
-            if rotate_disabled and rotate_checkbox:
-                st.info("Rotation disabled when target width is specified")
-            
-            # Apply target width resizing if specified
-            if target_width_mm > 0:
-                image = resize_image_to_width(image, target_width_mm)
-            
+                st.text("General options:")
+                mirror_checkbox = st.checkbox("Mirror Mask", value=False)
+                border_checkbox = st.checkbox("Show border in preview", value=True, help="Adds a border in the preview to help visualize boundaries (not printed)")
+                equalize_checkbox = st.checkbox("Apply Histogram Equalization", value=False, help="Enhance image contrast")
+                
+                # Add target width in mm option
+                target_width_mm = st.number_input("Target Width (mm)", min_value=0, value=0)
+                
+                # Disable rotation if target width is specified
+                rotate_disabled = target_width_mm > 0
+                rotate_checkbox = st.checkbox("rotate 90deg", value=False, disabled=rotate_disabled)
+                if rotate_disabled and rotate_checkbox:
+                    st.info("Rotation disabled when target width is specified")
+                
+                # Apply target width resizing if specified
+                if target_width_mm > 0:
+                    image = resize_image_to_width(image, target_width_mm)
+                
+                if mirror_checkbox:
+                    image = ImageOps.mirror(image)
+
+                # Apply histogram equalization if selected
+                if equalize_checkbox:
+                    image = apply_histogram_equalization(image)
+
+                # Process image based on choice
+                if print_choice == "Original":
+                    dither = st.checkbox("Dither - approximate grey tones with dithering", value=True)
+                    grayscale_image, dithered_image = preper_image(image)
+                    display_image = dithered_image if dither else grayscale_image
+                else:  # Threshold
+                    threshold_percent = st.slider("Threshold (%)", 0, 100, 50)
+                    threshold = int(threshold_percent * 255 / 100)
+                    display_image = apply_threshold(image, threshold)
+
+                # Create a copy for display with border if needed
+                preview_image = display_image.copy()
+                if border_checkbox:
+                    preview_image = add_border(preview_image)
+
+            with col2:
+                st.image(preview_image, caption="Preview", use_container_width=True)
+
+            print_button_label = f"Print {print_choice} Image"
+            if print_choice == "Original" and dither:
+                print_button_label += ", Dithering"
+            if rotate_checkbox and not rotate_disabled:
+                print_button_label += ", Rotated 90°"
             if mirror_checkbox:
-                image = ImageOps.mirror(image)
+                print_button_label += ", Mirrored"
+            if target_width_mm > 0:
+                print_button_label += f", Width: {target_width_mm}mm"
 
-            # Apply histogram equalization if selected
-            if equalize_checkbox:
-                image = apply_histogram_equalization(image)
-
-            # Process image based on choice
-            if print_choice == "Original":
-                dither = st.checkbox("Dither - approximate grey tones with dithering", value=True)
-                grayscale_image, dithered_image = preper_image(image)
-                display_image = dithered_image if dither else grayscale_image
-            else:  # Threshold
-                threshold_percent = st.slider("Threshold (%)", 0, 100, 50)
-                threshold = int(threshold_percent * 255 / 100)
-                display_image = apply_threshold(image, threshold)
-
-            # Create a copy for display with border if needed
-            preview_image = display_image.copy()
-            if border_checkbox:
-                preview_image = add_border(preview_image)
-
-        with col2:
-            st.image(preview_image, caption="Preview", use_container_width=True)
-
-        print_button_label = f"Print {print_choice} Image"
-        if print_choice == "Original" and dither:
-            print_button_label += ", Dithering"
-        if rotate_checkbox and not rotate_disabled:
-            print_button_label += ", Rotated 90°"
-        if mirror_checkbox:
-            print_button_label += ", Mirrored"
-        if target_width_mm > 0:
-            print_button_label += f", Width: {target_width_mm}mm"
-
-        if st.button(print_button_label):
-            rotate = 90 if (rotate_checkbox and not rotate_disabled) else 0
-            if print_choice == "Original":
-                print_image(grayscale_image, rotate=rotate, dither=dither)
-            else:
-                print_image(display_image, rotate=rotate, dither=False)
-            st.success("Print job sent to printer!")
+            if st.button(print_button_label):
+                rotate = 90 if (rotate_checkbox and not rotate_disabled) else 0
+                if print_choice == "Original":
+                    print_image(grayscale_image, rotate=rotate, dither=dither)
+                else:
+                    print_image(display_image, rotate=rotate, dither=False)
+                st.success("Print job sent to printer!")
+                
+        except Exception as e:
+            st.error(f"Error processing image: {str(e)}")
+            st.info("Please try another image or format")
 
 # history tab
 with tab7:
