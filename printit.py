@@ -827,11 +827,10 @@ with tab2:
                 print(f"- Label width: {label_width} dots")
                 print(f"- Longest line: {chars_per_line} characters")
                 
-                # Base size on "write something" which looks good at 107 on a 696-dot label
-                # Scale the base size according to the current label width
+                # Base size on 62mm label (696 dots) which looks good at size 60
                 base_text_length = 14  # "write something" length
-                base_label_width = 696  # Width for which 107 looks good
-                base_font_size = 107
+                base_label_width = 696  # Width for 62mm label
+                base_font_size = 60     # Known good size for 62mm label
                 
                 # Scale base font size according to label width
                 width_scale = label_width / base_label_width
@@ -845,8 +844,8 @@ with tab2:
                 # Now scale according to text length
                 font_size = int(scaled_base_size * (base_text_length / chars_per_line))
                 
-                # Ensure minimum size of 50
-                font_size = max(font_size, 50)
+                # Ensure minimum size of 20
+                font_size = max(font_size, 20)
                 
                 print(f"- Final font size: {font_size}")
                 
@@ -855,7 +854,7 @@ with tab2:
                 max_size = calculate_max_font_size(label_width, text, font)
                 font_size = max_size
         except Exception as e:
-            max_size = 107  # Default to known good size
+            max_size = 60  # Default to known good size for 62mm
             font_size = max_size
             print(f"Error calculating font size: {e}")
 
@@ -892,15 +891,15 @@ with tab2:
                         chars_per_line = 1
                     # Use same calculation as above
                     base_text_length = 14
-                    base_font_size = 107
+                    base_font_size = 60
                     font_size = int(base_font_size * (base_text_length / chars_per_line))
-                    font_size = max(font_size, 50)
+                    font_size = max(font_size, 20)
                     max_size = font_size
                 else:
                     max_size = calculate_max_font_size(label_width, text, font)
             except Exception as e:
                 print(f"Error calculating font size for {font}: {e}")
-            font_size = st.slider("Font Size", 50, max_size + 50, max_size)
+            font_size = st.slider("Font Size", 20, max_size + 50, max_size)
 
         # Font Size
         try:
