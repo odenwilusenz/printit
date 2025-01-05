@@ -811,7 +811,7 @@ with tab2:
             return 50  # Return reasonable default size if anything fails
 
     # Multiline Text Input
-    text = st.text_area("Enter your text to print", "write something", height=200)
+    text = st.text_area("Enter your text to print", "write something\n", height=200)
     # Check if the text has been changed by the user
     if text:
         urls = find_url(text)
