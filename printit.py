@@ -652,9 +652,16 @@ st.title(st.secrets.get("title", "STICKER FACTORY"))
 
 st.subheader(":printer: hard copies of images and text")
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
-    ["Sticker", "Label", "Text2image", "Webcam", "Cat", "Mask Pro", "history", "FAQ"]
-)
+# Get active tab from session state or default to first tab
+if 'active_tab' not in st.session_state:
+    st.session_state.active_tab = 0
+
+tabs = ["Sticker", "Label", "Text2image", "Webcam", "Cat", "Mask Pro", "history", "FAQ"]
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(tabs)
+
+# Set the active tab
+if 'selected_image_path' in st.session_state:
+    st.session_state.active_tab = 0  # Switch to Sticker tab
 
 # Initialize the session state for the prompt and image
 if "prompt" not in st.session_state:
@@ -673,6 +680,53 @@ def submit():
 # sticker
 with tab1:
     st.subheader("Sticker")
+
+    # Check if there's a selected image from history
+    if 'selected_image_path' in st.session_state:
+        image_path = st.session_state.selected_image_path
+        try:
+            image_to_process = Image.open(image_path).convert("RGB")
+            grayscale_image, dithered_image = preper_image(image_to_process)
+            
+            st.info(f"Image loaded from history: {os.path.basename(image_path)}")
+            
+            # Create checkboxes for rotation and dithering
+            col1, col2 = st.columns(2)
+            with col1:
+                dither_checkbox = st.checkbox(
+                    "Dither - _use for high detail, true by default_", value=True,
+                    key="dither_history"
+                )
+            with col2:
+                rotate_checkbox = st.checkbox("Rotate - _90 degrees_", key="rotate_history")
+
+            # Display image based on checkbox status
+            if dither_checkbox:
+                st.image(dithered_image, caption="Resized and Dithered Image")
+            else:
+                st.image(image_to_process, caption="Original Image")
+
+            # Print button
+            button_text = "Print "
+            if rotate_checkbox:
+                button_text += "Rotated "
+            if dither_checkbox:
+                button_text += "Dithered "
+            button_text += "Image"
+
+            if st.button(button_text, key="print_history"):
+                rotate_value = 90 if rotate_checkbox else 0
+                dither_value = dither_checkbox
+                print_image(image_to_process, rotate=rotate_value, dither=dither_value)
+                
+            if st.button("Clear Selection"):
+                del st.session_state.selected_image_path
+                st.rerun()
+                
+        except Exception as e:
+            st.error(f"Error loading image: {str(e)}")
+            del st.session_state.selected_image_path
+            st.rerun()
 
     # Allow the user to upload an image
     uploaded_image = st.file_uploader(
@@ -1432,9 +1486,12 @@ with tab7:
                         ).strftime("%Y-%m-%d %H:%M")
                         st.caption(f"{filename}\n{modified_time}")
 
-                        if st.button(f"Print", key=f"print_{idx}_{st.session_state.page_number}"):
-                            print_image(image, dither=True)
-                            st.success("Sent to printer!")
+                        if st.button(f"Send to Sticker tab", key=f"send_to_sticker_{idx}_{st.session_state.page_number}"):
+                            # Store image path in session state
+                            st.session_state.selected_image_path = image_path
+                            # Store tab selection in session state
+                            st.session_state.active_tab = "Sticker"
+                            st.rerun()
     else:
         st.info("Select this tab to view history")
 
