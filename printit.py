@@ -678,12 +678,39 @@ with tab1:
     uploaded_image = st.file_uploader(
         "Choose an image file to print", type=["png", "jpg", "gif", "webp"]
     )
+    
+    # Or fetch from URL
+    image_url = st.text_input("Or enter an HTTPS image URL to fetch and print")
 
-    # Initialize a variable for the image to be processed
+    # Initialize variables for image processing
     image_to_process = None
     filename = None  # To hold the filename without extension
 
-    # Check if an image has been uploaded
+    # Function to validate and fetch image from URL
+    def fetch_image_from_url(url):
+        if not url.startswith('https://'):
+            st.error('Only HTTPS URLs are allowed for security')
+            return None
+            
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            
+            # Verify content type is an image
+            content_type = response.headers.get('content-type', '')
+            if not content_type.startswith('image/'):
+                st.error('URL does not point to a valid image')
+                return None
+                
+            return Image.open(io.BytesIO(response.content)).convert("RGB")
+        except requests.exceptions.RequestException as e:
+            st.error(f'Error fetching image: {str(e)}')
+            return None
+        except Exception as e:
+            st.error(f'Error processing image: {str(e)}')
+            return None
+
+    # Process uploaded file or URL
     if uploaded_image is not None:
         # Convert the uploaded file to a PIL Image
         image_to_process = Image.open(uploaded_image).convert("RGB")
@@ -738,6 +765,48 @@ with tab1:
         
         # Save original image
         image_to_process.save(original_image_path, "PNG")
+    elif image_url:
+        # Try to fetch and process image from URL
+        image_to_process = fetch_image_from_url(image_url)
+        if image_to_process:
+            filename = safe_filename(os.path.basename(image_url))
+            
+            # Process the fetched image
+            grayscale_image, dithered_image = preper_image(image_to_process)
+            
+            # Create checkboxes for rotation and dithering
+            col1, col2 = st.columns(2)
+            with col1:
+                dither_checkbox = st.checkbox(
+                    "Dither - _use for high detail, true by default_", value=True,
+                    key="dither_url"
+                )
+            with col2:
+                rotate_checkbox = st.checkbox("Rotate - _90 degrees_", key="rotate_url")
+
+            # Determine button text
+            button_text = "Print "
+            if rotate_checkbox:
+                button_text += "Rotated "
+            if dither_checkbox:
+                button_text += "Dithered "
+            button_text += "Image"
+
+            # Print button
+            if st.button(button_text, key="print_url"):
+                rotate_value = 90 if rotate_checkbox else 0
+                dither_value = dither_checkbox
+                print_image(image_to_process, rotate=rotate_value, dither=dither_value)
+
+            # Display image based on checkbox status
+            if dither_checkbox:
+                st.image(dithered_image, caption="Resized and Dithered Image")
+            else:
+                st.image(image_to_process, caption="Original Image")
+
+            # Save original image
+            original_image_path = os.path.join("temp", filename)
+            image_to_process.save(original_image_path, "PNG")
 
 # label
 with tab2:
@@ -1154,12 +1223,41 @@ with tab5:
 with tab6:
     st.subheader("Mask Pro")
     
+    # Allow file upload or URL input
     uploaded_file = st.file_uploader("Choose an image for mask...", type=["jpg", "jpeg", "png", "gif", "webp", "bmp"], key="mask_uploader")
+    image_url = st.text_input("Or enter an HTTPS image URL to fetch and process", key="mask_url")
 
-    if uploaded_file is not None:
-        try:
-            # Load and convert image to RGB to ensure compatibility
+    # Initialize image variable
+    image = None
+
+    try:
+        if uploaded_file is not None:
+            # Process uploaded file
             image = Image.open(uploaded_file)
+        elif image_url:
+            # Validate and fetch image from URL
+            if not image_url.startswith('https://'):
+                st.error('Only HTTPS URLs are allowed for security')
+            else:
+                try:
+                    response = requests.get(image_url, timeout=10)
+                    response.raise_for_status()
+                    
+                    # Verify content type is an image
+                    content_type = response.headers.get('content-type', '')
+                    if not content_type.startswith('image/'):
+                        st.error('URL does not point to a valid image')
+                    else:
+                        image = Image.open(io.BytesIO(response.content))
+                except requests.exceptions.RequestException as e:
+                    st.error(f'Error fetching image: {str(e)}')
+                except Exception as e:
+                    st.error(f'Error processing image: {str(e)}')
+    except Exception as e:
+        st.error(f'Error loading image: {str(e)}')
+        st.info("Please try another image or format")
+
+    if image is not None:
             if image.mode == "RGBA":
                 # Handle transparency
                 background = Image.new("RGBA", image.size, "white")
@@ -1245,10 +1343,6 @@ with tab6:
                 else:
                     print_image(display_image, rotate=rotate, dither=False)
                 st.success("Print job sent to printer!")
-                
-        except Exception as e:
-            st.error(f"Error processing image: {str(e)}")
-            st.info("Please try another image or format")
 
 # history tab
 with tab7:
