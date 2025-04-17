@@ -319,68 +319,48 @@ label_dir = "labels"
 os.makedirs(label_dir, exist_ok=True)
 
 
+
 def generate_image(prompt, steps):
-    payload = {"prompt": prompt, "steps": steps, "width": label_width}
-    
-    # Get txt2img_url from secrets with default fallback
-    txt2img_url = st.secrets.get("txt2img_url", "http://localhost:7860")
-    
-    # Show warning if using default URL
-    if txt2img_url == "http://localhost:7860":
-        st.warning("Using default Stable Diffusion URL (http://localhost:7860). Configure txt2img_url in .streamlit/secrets.toml for custom endpoint.")
-
     try:
-        response = requests.post(url=f'{txt2img_url}/sdapi/v1/txt2img', json=payload)
+        # Load a template image from a path (you can modify this path as needed)
+        template_path = "templates/template.png"  # Change this to your template image path
+        image = Image.open(template_path)
+        
+        # Create a drawing context
+        draw = ImageDraw.Draw(image)
+        
+        # You might want to customize these font settings
+        try:
+            font = ImageFont.truetype("fonts/DelaGothicOne-Regular.ttf", size=35)  # Change font path and size as needed
+        except:
+            font = ImageFont.load_default()  # Fallback to default font
+        
+        # Add the prompt text to the image
+        # You can customize position (10,10), color, etc.
+        #draw.text((540, 680), prompt, fill="black", font=font)
+        
+        # Calculate text size
+        text_width = draw.textlength(prompt, font=font)
 
-        # Check if the request was successful
-        response.raise_for_status()
+        # Calculate the x position to center the text
+        x = 540 - text_width // 2
+        y = 685  # Your desired y-coordinate
 
-        # Print raw response content for debugging
-        print("Raw response content:", response.content)
+        # Draw the centered text
+        draw.text((x, y), prompt, fill="black", font=font)
 
-        r = response.json()
-
-        if r["images"]:
-            first_image = r["images"][0]
-            base64_data = (
-                first_image.split("base64,")[1]
-                if "base64," in first_image
-                else first_image
-            )
-            image = Image.open(io.BytesIO(base64.b64decode(base64_data)))
-
-            png_payload = {"image": "data:image/png;base64," + first_image}
-            response2 = requests.post(
-                url=f"{txt2img_url}/sdapi/v1/png-info", json=png_payload
-            )
-            response2.raise_for_status()
-
-            # save image
-            pnginfo = PngImagePlugin.PngInfo()
-            info = response2.json().get("info")
-            if info:
-                pnginfo.add_text("parameters", str(info))
-            current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            temp_dir = "temp"
-            os.makedirs(temp_dir, exist_ok=True)
-            filename = os.path.join(temp_dir, "txt2img_" + current_date + ".png")
-            image.save(filename, pnginfo=pnginfo)
-
-            return image
-        else:
-            print("No images found in the response")
-            return None
-
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while making the request: {e}")
-        return None
-    except ValueError as e:
-        print(f"An error occurred while parsing the JSON response: {e}")
-        return None
+        # Optionally save the modified image (similar to original function)
+        current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        temp_dir = "temp"
+        os.makedirs(temp_dir, exist_ok=True)
+        filename = os.path.join(temp_dir, "text2img_" + current_date + ".png")
+        image.save(filename)
+        
+        return image
+        
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"An error occurred: {e}")
         return None
-
 
 def preper_image(image, label_width=label_width):
     # Debug print original image size
@@ -650,13 +630,13 @@ if not os.path.exists(".streamlit/secrets.toml"):
 
 st.title(st.secrets.get("title", "STICKER FACTORY"))
 
-st.subheader(":printer: hard copies of images and text")
+st.subheader("We print :shit: and other stuff")
 
 # Get active tab from session state or default to first tab
 if 'active_tab' not in st.session_state:
     st.session_state.active_tab = 0
 
-tabs = ["Sticker", "Label", "Text2image", "Webcam", "Cat", "Mask Pro", "history", "FAQ"]
+tabs = ["Osterlan", "Label", "Image", "Webcam", "Cat", "Mask Pro", "history", "FAQ"]
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(tabs)
 
 # Set the active tab
@@ -678,7 +658,7 @@ def submit():
     )
 
 # sticker
-with tab1:
+with tab3:
     st.subheader("Sticker")
 
     # Check if there's a selected image from history
@@ -1161,16 +1141,16 @@ with tab2:
     )
 
 # text2img
-with tab3:
-    st.subheader(":printer: image from text")
-    st.write("using tami stable diffusion bot")
+with tab1:
+    st.subheader(":computer: OSTERLAN 2025 Sticker")
+    # st.write("stickerprinter go -brrrr")
 
-    st.text_input("Enter a prompt", key="widget", on_change=submit)
+    st.text_input("Dein Username", key="widget", on_change=submit)
     prompt = st.session_state.prompt
 
     if prompt and st.session_state.generated_image is None:
-        st.write("Generating image from prompt: " + prompt)
-        generated_image = generate_image(prompt, 30)
+        st.write("Username: " + prompt + " is now shared with 3001 of our partners")
+        generated_image = generate_image(prompt.upper(), 30)
         st.session_state.generated_image = (
             generated_image  # Store the generated image in session state
         )
@@ -1179,21 +1159,10 @@ with tab3:
         generated_image = st.session_state.generated_image
         grayscale_image, dithered_image = preper_image(generated_image)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(grayscale_image, caption="Original Image")
-        with col2:
-            st.image(dithered_image, caption="Resized and Dithered Image")
+        print_image(grayscale_image)
+        st.success("Printer goes -brrbrrbrr -cht")
+        st.warning("Nutze die Scheere um den Sticker auszuschneiden :scissors:")
 
-        col3, col4 = st.columns(2)
-        with col3:
-            if st.button("Print Original Image", key="print_original_t2i"):
-                print_image(grayscale_image)
-                st.success("Original image sent to printer!")
-        with col4:
-            if st.button("Print Dithered Image", key="print_dithered_t2i"):
-                print_image(grayscale_image, dither=True)
-                st.success("Dithered image sent to printer!")
 
     # Update last prompt
     st.session_state.last_prompt = prompt
